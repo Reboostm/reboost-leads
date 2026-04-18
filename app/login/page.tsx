@@ -19,15 +19,21 @@ export default function LoginPage() {
 
   // Check authentication state on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
-      setUser(currentUser);
-      setCheckingAuth(false);
-      if (currentUser) {
-        router.push('/dashboard');
-      }
-    });
+    try {
+      const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
+        setUser(currentUser);
+        setCheckingAuth(false);
+        if (currentUser) {
+          router.push('/dashboard');
+        }
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Auth state change error:', error);
+      setCheckingAuth(false);
+      setError('Failed to initialize authentication. Please refresh the page.');
+    }
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {

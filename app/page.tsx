@@ -10,16 +10,23 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
-      if (!currentUser) {
-        router.push('/login');
-      } else {
-        router.push('/dashboard');
-      }
-      setLoading(false);
-    });
+    try {
+      const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
+        if (!currentUser) {
+          router.push('/login');
+        } else {
+          router.push('/dashboard');
+        }
+        setLoading(false);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Auth state change error:', error);
+      setLoading(false);
+      // Default to login page on auth failure
+      router.push('/login');
+    }
   }, [router]);
 
   if (loading) {
