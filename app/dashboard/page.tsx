@@ -46,7 +46,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">ReBoot Leads Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">ReBoost Leads Dashboard</h1>
           <button
             onClick={handleLogout}
             className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition"
@@ -61,7 +61,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Welcome to ReBoot Leads!</h2>
           <div className="space-y-3">
             <p className="text-gray-700">
-              You are now logged into the ReBoot Leads admin portal.
+              You are now logged into the ReBoost Leads admin portal.
             </p>
             <p className="text-gray-700">
               This is your dashboard where you can manage leads and configure the lead generation system.
