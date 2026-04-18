@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 // This component must be dynamic to avoid prerendering issues with Firebase
 export const dynamic = 'force-dynamic';
+
+import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
