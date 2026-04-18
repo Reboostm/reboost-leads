@@ -22,15 +22,31 @@ export function getAuthInstance(): Auth {
     throw new Error('Firebase Auth can only be used in the browser');
   }
 
+  // Log the config for debugging (API key will be partially visible)
+  const config = { ...firebaseConfig };
+  if (config.apiKey) {
+    config.apiKey = config.apiKey.substring(0, 10) + '...';
+  }
+
   const apps = getApps();
   let app;
   if (apps.length === 0) {
-    app = initializeApp(firebaseConfig);
+    try {
+      app = initializeApp(firebaseConfig);
+    } catch (error) {
+      console.error('Failed to initialize Firebase app:', error);
+      throw error;
+    }
   } else {
     app = apps[0];
   }
 
-  authInstance = getAuth(app);
+  try {
+    authInstance = getAuth(app);
+  } catch (error) {
+    console.error('Failed to get Auth instance:', error);
+    throw error;
+  }
 
   // Connect to Auth emulator in development (optional)
   if (process.env.NODE_ENV === 'development') {
