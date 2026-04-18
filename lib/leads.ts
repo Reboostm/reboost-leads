@@ -1,0 +1,323 @@
+/**
+ * Lead Database Operations
+ * CRUD operations for leads in Firestore
+ */
+
+import { db } from './firebase';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  getDoc,
+  doc,
+  query,
+  where,
+  updateDoc,
+  deleteDoc,
+  Timestamp,
+  writeBatch,
+  DocumentData,
+  QueryConstraint,
+} from 'firebase/firestore';
+import { Lead, LeadSearch, DailyImportMetrics } from './types/lead';
+import { generateFingerprint, normalizeEmail, normalizePhone } from './deduplication';
+
+const LEADS_COLLECTION = 'leads';
+const SEARCHES_COLLECTION = 'lead_searches';
+const METRICS_COLLECTION = 'import_metrics';
+
+/**
+ * Check if a lead already exists (deduplication check)
+ */
+export async function checkLeadExists(
+  businessName: string,
+  city: string,
+  state: string,
+  phone?: string,
+  email?: string
+): Promise<{ exists: boolean; leadId?: string }> {
+  const fingerprint = generateFingerprint(businessName, city, state, phone, email);
+
+  // Check by fingerprint first
+  const fingerprintQuery = query(
+    collection(db, LEADS_COLLECTION),
+    where('fingerprint', '==', fingerprint)
+  );
+  const fingerprintResults = await getDocs(fingerprintQuery);
+
+  if (!fingerprintResults.empty) {
+    return { exists: true, leadId: fingerprintResults.docs[0].id };
+  }
+
+  // Check by email if provided
+  if (email) {
+    const normalizedEmail = normalizeEmail(email);
+    const emailQuery = query(
+      collection(db, LEADS_COLLECTION),
+      where('primaryEmail', '==', normalizedEmail)
+    );
+    const emailResults = await getDocs(emailQuery);
+
+    if (!emailResults.empty) {
+      return { exists: true, leadId: emailResults.docs[0].id };
+    }
+  }
+
+  // Check by phone if provided
+  if (phone) {
+    const normalizedPhone = normalizePhone(phone);
+    const phoneQuery = query(
+      collection(db, LEADS_COLLECTION),
+      where('primaryPhone', '==', normalizedPhone)
+    );
+    const phoneResults = await getDocs(phoneQuery);
+
+    if (!phoneResults.empty) {
+      return { exists: true, leadId: phoneResults.docs[0].id };
+    }
+  }
+
+  return { exists: false };
+}
+
+/**
+ * Create a new lead
+ */
+export async function createLead(lead: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>): Promise<string> {
+  // Generate fingerprint if not provided
+  const fingerprint =
+    lead.fingerprint ||
+    generateFingerprint(lead.businessName, lead.city, lead.state, lead.primaryPhone, lead.primaryEmail);
+
+  const leadData = {
+    ...lead,
+    fingerprint,
+    dateFound: Timestamp.now(),
+    dateLastUpdated: Timestamp.now(),
+    sources: lead.sources || [],
+    status: lead.status || 'active',
+  };
+
+  const docRef = await addDoc(collection(db, LEADS_COLLECTION), leadData);
+  return docRef.id;
+}
+
+/**
+ * Get lead by ID
+ */
+export async function getLead(leadId: string): Promise<Lead | null> {
+  const docRef = doc(db, LEADS_COLLECTION, leadId);
+  const docSnap = await getDoc(docRef);
+
+  if (!docSnap.exists()) {
+    return null;
+  }
+
+  return docSnap.data() as Lead;
+}
+
+/**
+ * Get all leads with optional filtering
+ */
+export async function getLeads(filters?: {
+  niche?: string;
+  state?: string;
+  city?: string;
+  status?: string;
+  limit?: number;
+}): Promise<Lead[]> {
+  const constraints: QueryConstraint[] = [];
+
+  if (filters?.niche) {
+    constraints.push(where('primaryNiche', '==', filters.niche));
+  }
+  if (filters?.state) {
+    constraints.push(where('state', '==', filters.state));
+  }
+  if (filters?.city) {
+    constraints.push(where('city', '==', filters.city));
+  }
+  if (filters?.status) {
+    constraints.push(where('status', '==', filters.status));
+  }
+
+  const q = constraints.length > 0 ? query(collection(db, LEADS_COLLECTION), ...constraints) : query(collection(db, LEADS_COLLECTION));
+
+  const querySnapshot = await getDocs(q);
+  const leads: Lead[] = [];
+
+  querySnapshot.forEach((doc) => {
+    leads.push(doc.data() as Lead);
+  });
+
+  return filters?.limit ? leads.slice(0, filters.limit) : leads;
+}
+
+/**
+ * Get leads count for a specific niche/state
+ */
+export async function getLeadsCount(niche: string, state: string, city?: string): Promise<number> {
+  const constraints: QueryConstraint[] = [
+    where('primaryNiche', '==', niche),
+    where('state', '==', state),
+  ];
+
+  if (city) {
+    constraints.push(where('city', '==', city));
+  }
+
+  const q = query(collection(db, LEADS_COLLECTION), ...constraints);
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.size;
+}
+
+/**
+ * Update a lead
+ */
+export async function updateLead(leadId: string, updates: Partial<Lead>): Promise<void> {
+  const docRef = doc(db, LEADS_COLLECTION, leadId);
+  await updateDoc(docRef, {
+    ...updates,
+    dateLastUpdated: Timestamp.now(),
+  });
+}
+
+/**
+ * Delete a lead
+ */
+export async function deleteLead(leadId: string): Promise<void> {
+  const docRef = doc(db, LEADS_COLLECTION, leadId);
+  await deleteDoc(docRef);
+}
+
+/**
+ * Batch create leads with deduplication
+ * Returns: { created, duplicates, failed }
+ */
+export async function batchCreateLeads(
+  leadsToCreate: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[]
+): Promise<{
+  created: number;
+  duplicates: number;
+  failed: number;
+  newLeads: string[];
+}> {
+  const batch = writeBatch(db);
+  const newLeadIds: string[] = [];
+  let duplicateCount = 0;
+  let failedCount = 0;
+
+  for (const lead of leadsToCreate) {
+    try {
+      const { exists } = await checkLeadExists(
+        lead.businessName,
+        lead.city,
+        lead.state,
+        lead.primaryPhone,
+        lead.primaryEmail
+      );
+
+      if (exists) {
+        duplicateCount++;
+        continue;
+      }
+
+      const fingerprint = generateFingerprint(
+        lead.businessName,
+        lead.city,
+        lead.state,
+        lead.primaryPhone,
+        lead.primaryEmail
+      );
+
+      const leadRef = doc(collection(db, LEADS_COLLECTION));
+      batch.set(leadRef, {
+        ...lead,
+        fingerprint,
+        dateFound: Timestamp.now(),
+        dateLastUpdated: Timestamp.now(),
+        sources: lead.sources || [],
+        status: lead.status || 'active',
+      });
+
+      newLeadIds.push(leadRef.id);
+    } catch (error) {
+      failedCount++;
+      console.error(`Failed to process lead: ${lead.businessName}`, error);
+    }
+  }
+
+  await batch.commit();
+
+  return {
+    created: newLeadIds.length,
+    duplicates: duplicateCount,
+    failed: failedCount,
+    newLeads: newLeadIds,
+  };
+}
+
+/**
+ * Create or update a search configuration
+ */
+export async function saveLeadSearch(search: Omit<LeadSearch, 'id'>): Promise<string> {
+  const searchData = {
+    ...search,
+    dateCreated: search.dateCreated || Timestamp.now(),
+    dateLastRun: search.dateLastRun ? Timestamp.fromDate(search.dateLastRun) : null,
+  };
+
+  const docRef = await addDoc(collection(db, SEARCHES_COLLECTION), searchData);
+  return docRef.id;
+}
+
+/**
+ * Get all lead searches
+ */
+export async function getLeadSearches(): Promise<LeadSearch[]> {
+  const querySnapshot = await getDocs(collection(db, SEARCHES_COLLECTION));
+  const searches: LeadSearch[] = [];
+
+  querySnapshot.forEach((doc) => {
+    searches.push({ id: doc.id, ...(doc.data() as Omit<LeadSearch, 'id'>) });
+  });
+
+  return searches;
+}
+
+/**
+ * Update search configuration
+ */
+export async function updateLeadSearch(searchId: string, updates: Partial<LeadSearch>): Promise<void> {
+  const docRef = doc(db, SEARCHES_COLLECTION, searchId);
+  await updateDoc(docRef, updates);
+}
+
+/**
+ * Log daily import metrics
+ */
+export async function logImportMetrics(metrics: Omit<DailyImportMetrics, 'id'>): Promise<string> {
+  const metricsData = {
+    ...metrics,
+    date: Timestamp.now(),
+  };
+
+  const docRef = await addDoc(collection(db, METRICS_COLLECTION), metricsData);
+  return docRef.id;
+}
+
+/**
+ * Get import metrics for the last N days
+ */
+export async function getImportMetrics(days: number = 7): Promise<DailyImportMetrics[]> {
+  const querySnapshot = await getDocs(collection(db, METRICS_COLLECTION));
+  const metrics: DailyImportMetrics[] = [];
+
+  querySnapshot.forEach((doc) => {
+    metrics.push({ id: doc.id, ...(doc.data() as Omit<DailyImportMetrics, 'id'>) });
+  });
+
+  // Sort by date descending and filter to last N days
+  return metrics.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, days);
+}
