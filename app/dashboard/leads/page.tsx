@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lead, LeadSearch } from '../../../lib/types/lead';
-import { US_STATES, NICHES, LEAD_SOURCES, LEAD_STATUSES, getSourceInfo, getStatusLabel } from '../../../lib/constants';
+import { US_STATES, NICHES, LEAD_SOURCES, LEAD_STATUSES, getSourceInfo, getStatusLabel, API_EXPLANATIONS, STATUS_HELP } from '../../../lib/constants';
 
 interface DailyMetrics {
   date: string;
@@ -275,6 +275,51 @@ export default function LeadsPage() {
             </button>
           </div>
 
+          {/* API Explanation */}
+          {showNewSearchForm && (
+            <div className="p-6 border-b border-gray-200 bg-blue-50 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Google Maps Explanation */}
+                <div className="bg-white p-4 rounded-lg border border-blue-200">
+                  <h4 className="font-bold text-gray-900 mb-2">🗺️ Google Maps API - Finds Businesses</h4>
+                  <p className="text-sm text-gray-700 mb-2">Searches for businesses by location + service type.</p>
+                  <div className="text-xs text-gray-600 space-y-1 mb-3">
+                    <p><strong>Example:</strong> "House Cleaners in Salt Lake City"</p>
+                    <p><strong>What you get:</strong> Name, phone, address, website, rating</p>
+                    <p><strong>Cost:</strong> FREE (includes $200/month free credit)</p>
+                  </div>
+                  <a
+                    href={API_EXPLANATIONS.googleMaps.setup}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 hover:text-indigo-700 font-bold text-xs"
+                  >
+                    → Get Google Maps API Key
+                  </a>
+                </div>
+
+                {/* Hunter.io Explanation */}
+                <div className="bg-white p-4 rounded-lg border border-orange-200">
+                  <h4 className="font-bold text-gray-900 mb-2">✉️ Hunter.io API - Finds Emails</h4>
+                  <p className="text-sm text-gray-700 mb-2">Finds EMAIL ADDRESSES for businesses we discover.</p>
+                  <div className="text-xs text-gray-600 space-y-1 mb-3">
+                    <p><strong>Example:</strong> We find "acme.com" → Hunter finds "john@acme.com"</p>
+                    <p><strong>What you get:</strong> Business email addresses (95%+ accurate)</p>
+                    <p><strong>Cost:</strong> FREE: 100/month | Paid: $99+ | Create 5 free accounts = 500/month!</p>
+                  </div>
+                  <a
+                    href={API_EXPLANATIONS.hunterIO.setup}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-600 hover:text-orange-700 font-bold text-xs"
+                  >
+                    → Get Hunter.io API Key
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* New Search Form */}
           {showNewSearchForm && (
             <form onSubmit={handleCreateSearch} className="p-6 border-b border-gray-200 bg-gray-50">
@@ -444,15 +489,21 @@ export default function LeadsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Filter by Status</label>
+                <label className="block text-gray-700 font-medium mb-2">
+                  Filter by Status
+                  <span className="text-xs text-gray-500 ml-2">
+                    (Active = new leads not yet contacted)
+                  </span>
+                </label>
                 <select
                   value={filtering.status}
                   onChange={(e) => setFiltering({ ...filtering, status: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
+                  title="Active = new, Contacted = we reached out, Converted = customer, Rejected = not interested"
                 >
                   <option value="">All Statuses</option>
                   {LEAD_STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
+                    <option key={status.value} value={status.value} title={STATUS_HELP[status.value as keyof typeof STATUS_HELP]?.help || ''}>
                       {status.label}
                     </option>
                   ))}

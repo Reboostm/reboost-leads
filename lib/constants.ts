@@ -3,6 +3,56 @@
  * Configuration for dropdowns, sources, and display options
  */
 
+// API EXPLANATIONS (for user education)
+export const API_EXPLANATIONS = {
+  googleMaps: {
+    name: '🗺️ Google Maps API',
+    description: 'Finds businesses by location + service type (e.g., "House Cleaners in Salt Lake City")',
+    whatYouGet: [
+      'Business name',
+      'Phone number',
+      'Address & location',
+      'Website URL',
+      'Google rating & review count',
+      'Business hours',
+    ],
+    cost: 'FREE tier: $200/month free credit (plenty for most)',
+    setup: 'https://console.cloud.google.com/marketplace/product/google/maps-backend.googleapis.com',
+  },
+  hunterIO: {
+    name: '✉️ Hunter.io API',
+    description: 'Finds EMAIL ADDRESSES for businesses (using their website domain)',
+    whatYouGet: ['Business email addresses', 'Contact person names', 'Email verification (95%+ accurate)'],
+    cost: 'FREE tier: 100 emails/month. Paid: $99-999/month',
+    freeWorkaround: 'Create 5 Hunter accounts = 500 emails/month FREE',
+    setup: 'https://app.hunter.io/account/settings',
+  },
+};
+
+// LEAD STATUS EXPLANATIONS
+export const STATUS_HELP = {
+  active: {
+    label: 'Active',
+    help: 'New lead, not yet contacted',
+  },
+  contacted: {
+    label: 'Contacted',
+    help: 'We sent email/call, waiting for response',
+  },
+  converted: {
+    label: 'Converted',
+    help: 'Lead responded, became customer/client',
+  },
+  rejected: {
+    label: 'Rejected',
+    help: 'Lead not interested, not a fit',
+  },
+  archived: {
+    label: 'Archived',
+    help: 'Old lead, keeping but not actively pursuing',
+  },
+};
+
 // US States for dropdown selection
 export const US_STATES = [
   'Alabama',
@@ -57,22 +107,42 @@ export const US_STATES = [
   'Wyoming',
 ];
 
-// Common service niches for dropdown selection
+// Common service niches for dropdown selection - SPECIFIC to customize outreach
 export const NICHES = [
-  'Landscaping',
-  'Plumbing',
-  'HVAC',
-  'Roofing',
-  'Pressure Washing',
-  'Electrician',
-  'Cleaning',
+  // Cleaning Services
+  'House Cleaning - Residential',
+  'Commercial Cleaning - Offices',
+  'Carpet Cleaning & Restoration',
+  'Pressure Washing - Residential',
+  'Pressure Washing - Commercial',
+
+  // Outdoor Services
+  'Landscaping - Residential',
+  'Landscaping - Commercial',
+  'Tree Trimming & Removal',
+  'Lawn Care & Maintenance',
+
+  // Home Services
+  'Plumbing - Residential',
+  'Plumbing - Commercial',
+  'HVAC - Residential',
+  'HVAC - Commercial',
+  'Electrician - Residential',
+  'Electrician - Commercial',
+  'Roofing - Residential',
+  'Roofing - Commercial',
+
+  // Specialized
+  'Pest Control - Residential',
+  'Pest Control - Commercial',
   'General Contractor',
-  'Painting',
-  'Pest Control',
-  'Concrete',
+  'Painting - Residential',
+  'Painting - Commercial',
+  'Concrete & Masonry',
   'Carpentry',
-  'Masonry',
-  'Drywall',
+  'Drywall & Insulation',
+
+  // Catch-all
   'Custom',
 ];
 
@@ -133,6 +203,60 @@ export const LEAD_STATUSES = [
 
 // Conversion statuses for lead tracking
 export const CONVERSION_STATUSES = ['new', 'interested', 'converted', 'rejected'] as const;
+
+// Lead quality filters (for filtering and customizing outreach)
+export const LEAD_QUALITY_FILTERS = [
+  {
+    id: 'has-website',
+    label: 'Has Website',
+    help: 'Lead has a business website (professional, easier to research)',
+  },
+  {
+    id: 'no-website',
+    label: 'No Website',
+    help: 'Lead has no website (newer business or sole proprietor)',
+  },
+  {
+    id: 'has-email',
+    label: 'Email Found',
+    help: 'We found a business email (ready for email campaigns)',
+  },
+  {
+    id: 'no-email',
+    label: 'No Email Found',
+    help: 'Could not find email (phone-only or private)',
+  },
+  {
+    id: 'has-google-reviews',
+    label: 'Has Google Reviews',
+    help: 'Business has ratings/reviews (established, legitimate)',
+  },
+  {
+    id: 'no-google-reviews',
+    label: 'No Google Reviews',
+    help: 'No reviews found (new or not optimized)',
+  },
+  {
+    id: 'has-social',
+    label: 'Has Social Media',
+    help: 'LinkedIn/Facebook/Instagram found (social proof)',
+  },
+  {
+    id: 'no-social',
+    label: 'No Social Media',
+    help: 'No social profiles found',
+  },
+  {
+    id: 'high-rating',
+    label: '4+ Star Rating',
+    help: 'Google rating 4.0 or higher (quality business)',
+  },
+  {
+    id: 'low-rating',
+    label: 'Under 4 Stars',
+    help: 'Lower ratings (might be struggling)',
+  },
+];
 
 // API availability
 export const AVAILABLE_APIS = {
