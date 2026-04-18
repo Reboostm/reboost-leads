@@ -1,3 +1,5 @@
+'use client';
+
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
@@ -10,31 +12,16 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only if we're in the browser and haven't already initialized
-let app;
-let auth;
+// Initialize Firebase
+const apps = getApps();
+const app = apps.length === 0 ? initializeApp(firebaseConfig) : apps[0];
+export const auth = getAuth(app);
 
-if (typeof window !== 'undefined') {
-  // Browser environment
-  const apps = getApps();
-  if (apps.length === 0) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = apps[0];
+// Connect to Auth emulator in development (optional)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  try {
+    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  } catch (error) {
+    // Emulator may already be connected
   }
-  auth = getAuth(app);
-
-  // Connect to Auth emulator in development (optional)
-  if (process.env.NODE_ENV === 'development') {
-    try {
-      connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-    } catch (error) {
-      // Emulator may already be connected
-    }
-  }
-} else {
-  // Server environment - create dummy exports
-  auth = null as any;
 }
-
-export { auth };

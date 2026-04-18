@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 
 // This component must be dynamic to avoid prerendering issues with Firebase
 export const dynamic = 'force-dynamic';
