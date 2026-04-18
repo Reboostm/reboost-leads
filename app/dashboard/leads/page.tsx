@@ -1568,13 +1568,16 @@ export default function LeadsPage() {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">🎯 Lead Score Distribution</h3>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-              {Object.entries(analytics.scoreDistribution).map(([grade, count]) => (
-                <div key={grade} className="text-center">
-                  <p className="text-xs text-gray-600 mb-1">Grade {grade}</p>
-                  <p className="text-2xl font-bold">{count}</p>
-                  <p className="text-xs text-gray-500">{Math.round((count / analytics.summary.totalLeads) * 100)}%</p>
-                </div>
-              ))}
+              {Object.entries(analytics.scoreDistribution).map(([grade, count]) => {
+                const countNum = count as number;
+                return (
+                  <div key={grade} className="text-center">
+                    <p className="text-xs text-gray-600 mb-1">Grade {grade}</p>
+                    <p className="text-2xl font-bold">{countNum}</p>
+                    <p className="text-xs text-gray-500">{Math.round((countNum / analytics.summary.totalLeads) * 100)}%</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1582,7 +1585,7 @@ export default function LeadsPage() {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">🏆 Top Performing Niches</h3>
             <div className="space-y-3">
-              {analytics.topNiches.slice(0, 5).map((niche) => (
+              {analytics.topNiches.slice(0, 5).map((niche: any) => (
                 <div key={niche.niche} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                   <div>
                     <p className="font-medium text-gray-900">{niche.niche}</p>

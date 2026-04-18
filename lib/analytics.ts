@@ -210,8 +210,14 @@ export function generateAnalytics(leads: Lead[], searches: LeadSearch[]): Analyt
     })
     .sort((a, b) => b.leads - a.leads);
 
-  // Top niches
-  const topNiches = byNiche.slice(0, 10);
+  // Top niches (formatted for return type)
+  const topNiches = byNiche
+    .slice(0, 10)
+    .map((n) => ({
+      niche: n.niche,
+      leads: n.leadCount,
+      avgScore: n.avgScore,
+    }));
 
   // Location hotspots
   const locationMap = new Map<string, number>();
