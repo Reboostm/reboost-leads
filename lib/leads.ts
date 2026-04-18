@@ -196,7 +196,7 @@ export async function deleteLead(leadId: string): Promise<void> {
  * Returns: { created, duplicates, failed }
  */
 export async function batchCreateLeads(
-  leadsToCreate: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[]
+  leadsToCreate: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'>[]
 ): Promise<{
   created: number;
   duplicates: number;
@@ -297,7 +297,7 @@ export async function updateLeadSearch(searchId: string, updates: Partial<LeadSe
 /**
  * Log daily import metrics
  */
-export async function logImportMetrics(metrics: Omit<DailyImportMetrics, 'id'>): Promise<string> {
+export async function logImportMetrics(metrics: Omit<DailyImportMetrics, 'id' | 'date'>): Promise<string> {
   const metricsData = {
     ...metrics,
     date: Timestamp.now(),

@@ -135,7 +135,7 @@ export default async function handler(
 /**
  * Enrich leads with email addresses from Hunter.io
  */
-async function enrichLeadsWithEmails(leads: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[]): Promise<Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[]> {
+async function enrichLeadsWithEmails(leads: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'>[]): Promise<Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'>[]> {
   let enrichedCount = 0;
 
   for (const lead of leads) {

@@ -41,7 +41,7 @@ export async function searchGoogleMapsBusinesses(
   city?: string,
   apiKey?: string
 ): Promise<{
-  leads: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[];
+  leads: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'>[];
   totalResults: number;
   nextPageToken?: string;
 }> {
@@ -133,7 +133,7 @@ function transformGooglePlaceToLead(
   niche: string,
   state: string,
   city?: string
-): Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'> {
+): Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'> {
   // Parse address
   const addressParts = place.formatted_address?.split(',').map((s) => s.trim()) || [];
   const parsedCity = city || addressParts[0] || 'Unknown';

@@ -27,9 +27,8 @@ interface DailyJobResponse {
     searchResults: Array<{
       niche: string;
       state: string;
-      city?: string;
       leadsFound: number;
-      newLeadsAdded: number;
+      newLeads: number;
     }>;
     executionTime: number;
   };
@@ -123,9 +122,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         searchResults.push({
           niche: search.niche,
           state: search.state,
-          city: search.city,
           leadsFound: googleResults.leads.length,
-          newLeadsAdded: batchResult.created,
+          newLeads: batchResult.created,
         });
 
         // Update search with latest metrics
@@ -189,7 +187,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 /**
  * Enrich leads with email addresses from Hunter.io
  */
-async function enrichLeadsWithEmails(leads: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[]): Promise<Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated'>[]> {
+async function enrichLeadsWithEmails(leads: Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'>[]): Promise<Omit<Lead, 'id' | 'dateFound' | 'dateLastUpdated' | 'fingerprint'>[]> {
   let enrichedCount = 0;
 
   for (const lead of leads) {
