@@ -21,6 +21,8 @@ export default function ApiSetupPage() {
     reboostApiKey: '',
     cronSecret: '',
   });
+  const [testResults, setTestResults] = useState<any>(null);
+  const [testLoading, setTestLoading] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -51,6 +53,45 @@ export default function ApiSetupPage() {
       }
     } catch (error) {
       console.error('Error checking API status:', error);
+    }
+  };
+
+  const handleTestConnections = async () => {
+    if (!envVars.googleMapsApiKey && !envVars.hunterIoApiKey) {
+      alert('Please enter at least one API key to test');
+      return;
+    }
+
+    setTestLoading(true);
+    try {
+      const response = await fetch('/api/config/test-apis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          googleMapsApiKey: envVars.googleMapsApiKey || undefined,
+          hunterIOApiKey: envVars.hunterIoApiKey || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTestResults(data);
+      } else {
+        setTestResults({
+          success: false,
+          message: 'Test failed',
+          error: 'Could not connect to API test endpoint',
+        });
+      }
+    } catch (error) {
+      console.error('Error testing APIs:', error);
+      setTestResults({
+        success: false,
+        message: 'Connection error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -157,9 +198,19 @@ export default function ApiSetupPage() {
                   📊 {apiStatus.find((a) => a.service === 'google-maps')?.quotaInfo}
                 </p>
               )}
-              <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded text-sm transition">
-                Test Connection
+              <button
+                onClick={handleTestConnections}
+                disabled={testLoading || !envVars.googleMapsApiKey}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testLoading ? 'Testing...' : 'Test Connection'}
               </button>
+
+              {testResults?.results?.googleMaps && (
+                <div className={`mt-3 p-3 rounded text-sm ${testResults.results.googleMaps.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {testResults.results.googleMaps.message}
+                </div>
+              )}
             </div>
           </div>
 
@@ -204,9 +255,19 @@ export default function ApiSetupPage() {
               <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded border border-yellow-200">
                 ⚠️ Free tier: 100 calls/month. Consider multiple accounts for higher volume.
               </div>
-              <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded text-sm transition">
-                Test Connection
+              <button
+                onClick={handleTestConnections}
+                disabled={testLoading || !envVars.hunterIoApiKey}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testLoading ? 'Testing...' : 'Test Connection'}
               </button>
+
+              {testResults?.results?.hunterIO && (
+                <div className={`mt-3 p-3 rounded text-sm ${testResults.results.hunterIO.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {testResults.results.hunterIO.message}
+                </div>
+              )}
             </div>
           </div>
         </div>
