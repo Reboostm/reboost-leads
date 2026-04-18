@@ -284,7 +284,7 @@ export default function LeadsPage() {
                   <select
                     value={searchFormData.niche}
                     onChange={(e) => setSearchFormData({ ...searchFormData, niche: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
                     required
                     disabled={submitting}
                   >
@@ -301,7 +301,7 @@ export default function LeadsPage() {
                   <select
                     value={searchFormData.state}
                     onChange={(e) => setSearchFormData({ ...searchFormData, state: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
                     required
                     disabled={submitting}
                   >
@@ -320,7 +320,7 @@ export default function LeadsPage() {
                     placeholder="e.g., Salt Lake City"
                     value={searchFormData.city}
                     onChange={(e) => setSearchFormData({ ...searchFormData, city: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
                     disabled={submitting}
                   />
                 </div>
@@ -433,7 +433,7 @@ export default function LeadsPage() {
                 <select
                   value={filtering.state}
                   onChange={(e) => setFiltering({ ...filtering, state: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
                 >
                   <option value="">All States</option>
                   {US_STATES.map((state) => (
@@ -448,7 +448,7 @@ export default function LeadsPage() {
                 <select
                   value={filtering.status}
                   onChange={(e) => setFiltering({ ...filtering, status: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
                 >
                   <option value="">All Statuses</option>
                   {LEAD_STATUSES.map((status) => (
@@ -652,7 +652,7 @@ export default function LeadsPage() {
                               <label className="font-medium">Status:</label>
                               <select
                                 defaultValue={lead.status}
-                                className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                                className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-xs text-gray-900"
                               >
                                 {LEAD_STATUSES.map((status) => (
                                   <option key={status.value} value={status.value}>
