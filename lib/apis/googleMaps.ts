@@ -159,6 +159,8 @@ function transformGooglePlaceToLead(
     longitude: place.geometry?.location?.lng,
     sources: ['google-maps'],
     status: 'active',
+    tags: [], // PHASE 5: Initialize empty tags
+    ghlPushed: false, // PHASE 4: Initialize as not pushed
   };
 }
 

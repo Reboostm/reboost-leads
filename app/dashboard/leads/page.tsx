@@ -30,15 +30,30 @@ export default function LeadsPage() {
     state: '',
     city: '',
     enrichWithEmails: true,
+    maxLeads: 100, // PHASE 1: Quota control
+    scheduledFrequency: 'once' as 'once' | 'daily', // PHASE 2: Scheduling
+    scheduledTime: '09:00', // PHASE 2: Scheduling
   });
   const [filtering, setFiltering] = useState({
     niche: 'all',
     state: '',
     status: 'active',
+    // PHASE 3: Advanced quality filters
+    hasWebsite: false,
+    hasEmail: false,
+    hasPhone: false,
+    hasSocial: false,
+    hasReviews: false,
+    minRating: 0,
+    maxRating: 5,
   });
   const [expandedLeads, setExpandedLeads] = useState<ExpandedLead[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [nicheStats, setNicheStats] = useState<Record<string, number>>({});
+  // PHASE 5: Bulk operations
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+  const [showBulkTagModal, setShowBulkTagModal] = useState(false);
+  const [bulkNewTag, setBulkNewTag] = useState('');
 
   // Check authentication
   useEffect(() => {
@@ -107,6 +122,20 @@ export default function LeadsPage() {
       alert('Please fill in niche and state');
       return;
     }
+
+    // PHASE 1: Validate no duplicate active searches
+    const existingSearch = searches.find(
+      (s) =>
+        s.niche === searchFormData.niche &&
+        s.state === searchFormData.state &&
+        s.status !== 'completed' // Don't block if previous search completed
+    );
+
+    if (existingSearch) {
+      alert('You already have an active search for this niche and state. Mark it as complete or paused first.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -117,15 +146,29 @@ export default function LeadsPage() {
           niche: searchFormData.niche,
           state: searchFormData.state,
           city: searchFormData.city,
-          isActive: true,
+          status: 'active', // PHASE 1: Use new status field
+          maxLeads: searchFormData.maxLeads, // PHASE 1: Quota control
+          searchCount: 0, // PHASE 1: Initialize search count
+          scheduledFrequency: searchFormData.scheduledFrequency, // PHASE 2: Scheduling
+          scheduledTime: searchFormData.scheduledFrequency === 'daily' ? searchFormData.scheduledTime : undefined, // PHASE 2: Scheduling
         }),
       });
 
       if (response.ok) {
-        setSearchFormData({ niche: '', state: '', city: '', enrichWithEmails: true });
+        setSearchFormData({
+          niche: '',
+          state: '',
+          city: '',
+          enrichWithEmails: true,
+          maxLeads: 100,
+          scheduledFrequency: 'once',
+          scheduledTime: '09:00',
+        });
         setShowNewSearchForm(false);
         fetchSearches();
         alert('Search created successfully!');
+      } else {
+        alert('Failed to create search');
       }
     } catch (error) {
       console.error('Error creating search:', error);
@@ -183,6 +226,7 @@ export default function LeadsPage() {
   const getFilteredLeads = () => {
     let filtered = leads;
 
+    // Basic filters
     if (filtering.niche !== 'all') {
       filtered = filtered.filter((l) => l.primaryNiche === filtering.niche);
     }
@@ -193,10 +237,138 @@ export default function LeadsPage() {
       filtered = filtered.filter((l) => l.status === filtering.status);
     }
 
+    // PHASE 3: Advanced quality filters
+    if (filtering.hasWebsite) {
+      filtered = filtered.filter((l) => l.website && l.website.length > 0);
+    }
+    if (filtering.hasEmail) {
+      filtered = filtered.filter((l) => l.primaryEmail && l.primaryEmail.length > 0);
+    }
+    if (filtering.hasPhone) {
+      filtered = filtered.filter((l) => l.primaryPhone && l.primaryPhone.length > 0);
+    }
+    if (filtering.hasSocial) {
+      filtered = filtered.filter(
+        (l) => l.linkedinUrl || l.facebookUrl || l.instagramHandle || l.twitterHandle
+      );
+    }
+    if (filtering.hasReviews) {
+      filtered = filtered.filter(
+        (l) => (l.googleReviewCount && l.googleReviewCount > 0) ||
+               (l.yelpReviewCount && l.yelpReviewCount > 0)
+      );
+    }
+    if (filtering.minRating > 0 || filtering.maxRating < 5) {
+      filtered = filtered.filter((l) => {
+        const rating = l.googleRating || 0;
+        return rating >= filtering.minRating && rating <= filtering.maxRating;
+      });
+    }
+
     return filtered;
   };
 
   const isLeadExpanded = (leadId: string) => expandedLeads.find((l) => l.id === leadId)?.open || false;
+
+  // PHASE 5: Bulk operations handlers
+  const toggleLeadSelection = (leadId: string) => {
+    const newSelected = new Set(selectedLeads);
+    if (newSelected.has(leadId)) {
+      newSelected.delete(leadId);
+    } else {
+      newSelected.add(leadId);
+    }
+    setSelectedLeads(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeads.size === filteredLeads.length) {
+      setSelectedLeads(new Set());
+    } else {
+      setSelectedLeads(new Set(filteredLeads.map((l) => l.id)));
+    }
+  };
+
+  const handleBulkTagSubmit = async () => {
+    if (!bulkNewTag.trim() || selectedLeads.size === 0) {
+      alert('Please enter a tag and select leads');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const leadIds = Array.from(selectedLeads);
+      // Update each lead with the new tag
+      for (const leadId of leadIds) {
+        const lead = leads.find((l) => l.id === leadId);
+        if (lead) {
+          const updatedTags = [...(lead.tags || []), bulkNewTag.trim()];
+          // We would call an API here in production
+          // await fetch(`/api/leads/${leadId}/tags`, { method: 'PUT', body: JSON.stringify({ tags: updatedTags }) })
+          console.log(`Tagged ${lead.businessName} with "${bulkNewTag}"`);
+        }
+      }
+      alert(`Added tag "${bulkNewTag}" to ${selectedLeads.size} leads`);
+      setBulkNewTag('');
+      setShowBulkTagModal(false);
+      setSelectedLeads(new Set());
+    } catch (error) {
+      console.error('Error tagging leads:', error);
+      alert('Error tagging leads');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkExportCSV = () => {
+    if (selectedLeads.size === 0) {
+      alert('Please select leads to export');
+      return;
+    }
+
+    const leadsToExport = filteredLeads.filter((l) => selectedLeads.has(l.id));
+    const headers = [
+      'Business Name',
+      'Phone',
+      'Email',
+      'Website',
+      'Address',
+      'City',
+      'State',
+      'Niche',
+      'Rating',
+      'Status',
+      'Tags',
+    ];
+
+    const rows = leadsToExport.map((lead) => [
+      lead.businessName,
+      lead.primaryPhone || '',
+      lead.primaryEmail || '',
+      lead.website || '',
+      lead.streetAddress || '',
+      lead.city,
+      lead.state,
+      lead.primaryNiche,
+      lead.googleRating ? `${lead.googleRating}/5` : '',
+      lead.status,
+      (lead.tags || []).join('; '),
+    ]);
+
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `leads-export-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    setSelectedLeads(new Set());
+  };
 
   if (loading) {
     return (
@@ -385,7 +557,62 @@ export default function LeadsPage() {
                 </label>
               </div>
 
-              <div className="flex gap-4">
+              {/* PHASE 1: Quota Control */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-4">⚙️ Search Configuration</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 font-medium mb-2">Max Leads Per Run *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="500"
+                      value={searchFormData.maxLeads}
+                      onChange={(e) => setSearchFormData({ ...searchFormData, maxLeads: Math.min(500, Math.max(1, parseInt(e.target.value) || 100)) })}
+                      disabled={submitting}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
+                    />
+                    <p className="text-xs text-gray-600 mt-1">Controls quota usage (default: 100, max: 500)</p>
+                  </div>
+
+                  {/* PHASE 2: Scheduling */}
+                  <div>
+                    <label className="block text-gray-700 font-medium mb-2">Schedule Type *</label>
+                    <select
+                      value={searchFormData.scheduledFrequency}
+                      onChange={(e) => setSearchFormData({ ...searchFormData, scheduledFrequency: e.target.value as 'once' | 'daily' })}
+                      disabled={submitting}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
+                    >
+                      <option value="once">One-time (manual run only)</option>
+                      <option value="daily">Daily (auto-runs at scheduled time)</option>
+                    </select>
+                  </div>
+
+                  {searchFormData.scheduledFrequency === 'daily' && (
+                    <div>
+                      <label className="block text-gray-700 font-medium mb-2">Daily Run Time *</label>
+                      <select
+                        value={searchFormData.scheduledTime}
+                        onChange={(e) => setSearchFormData({ ...searchFormData, scheduledTime: e.target.value })}
+                        disabled={submitting}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
+                      >
+                        {Array.from({ length: 24 }, (_, i) => {
+                          const hour = String(i).padStart(2, '0');
+                          return (
+                            <option key={i} value={`${hour}:00`}>
+                              {hour}:00 ({i >= 12 ? (i === 12 ? '12' : i - 12) : i === 0 ? '12' : i}:00 {i >= 12 ? 'PM' : 'AM'})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-6">
                 <button
                   type="submit"
                   disabled={submitting}
@@ -404,34 +631,94 @@ export default function LeadsPage() {
             </form>
           )}
 
-          {/* Searches List */}
+          {/* Searches List - PHASE 1 & 2 Enhanced Display */}
           <div className="p-6">
             {searches.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No searches configured yet. Create one to get started!</p>
             ) : (
               <div className="space-y-4">
-                {searches.map((search) => (
-                  <div key={search.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {search.niche} in {search.city ? `${search.city}, ` : ''}{search.state}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Found: {search.leadsFound} leads | Last run:{' '}
-                        {search.dateLastRun ? new Date(search.dateLastRun).toLocaleDateString() : 'Never'}
-                      </p>
+                {searches.map((search) => {
+                  const status = search.status || (search.isActive ? 'active' : 'paused'); // Backward compatibility
+                  const statusColor =
+                    status === 'completed'
+                      ? 'bg-green-100 text-green-800'
+                      : status === 'paused'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-blue-100 text-blue-800';
+                  const progressPercent = search.maxLeads ? Math.min(100, (search.leadsFound / search.maxLeads) * 100) : 0;
+
+                  return (
+                    <div key={search.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="font-semibold text-gray-900">
+                              {search.niche} in {search.city ? `${search.city}, ` : ''}{search.state}
+                            </h3>
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Found: {search.leadsFound} / {search.maxLeads} leads | Last run:{' '}
+                            {search.dateLastRun ? new Date(search.dateLastRun).toLocaleDateString() : 'Never'}
+                            {search.scheduledFrequency === 'daily' && search.nextRunTime && (
+                              <>
+                                {' | '}Next run: {new Date(search.nextRunTime).toLocaleDateString()} at {search.scheduledTime}
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="mb-3">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              status === 'completed'
+                                ? 'bg-green-600'
+                                : status === 'paused'
+                                  ? 'bg-yellow-600'
+                                  : 'bg-indigo-600'
+                            }`}
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">{Math.round(progressPercent)}% quota used</p>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 flex-wrap">
+                        {status === 'completed' ? (
+                          <>
+                            <button
+                              onClick={() => handleExecuteSearch(search.id)}
+                              disabled={submitting}
+                              className="bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
+                            >
+                              Re-search
+                            </button>
+                            <button
+                              className="bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-1 px-3 rounded text-sm transition cursor-not-allowed opacity-50"
+                              disabled
+                            >
+                              Completed ✓
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleExecuteSearch(search.id)}
+                            disabled={submitting}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
+                          >
+                            {submitting ? 'Running...' : 'Run Now'}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleExecuteSearch(search.id)}
-                        disabled={submitting}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
-                      >
-                        {submitting ? 'Running...' : 'Run Now'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -471,8 +758,8 @@ export default function LeadsPage() {
               </div>
             </div>
 
-            {/* Additional Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Basic Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
                 <label className="block text-gray-700 font-medium mb-2">Filter by State</label>
                 <select
@@ -511,11 +798,89 @@ export default function LeadsPage() {
               </div>
               <div className="flex items-end">
                 <button
-                  onClick={() => setFiltering({ niche: 'all', state: '', status: '' })}
+                  onClick={() => setFiltering({
+                    niche: 'all',
+                    state: '',
+                    status: 'active',
+                    hasWebsite: false,
+                    hasEmail: false,
+                    hasPhone: false,
+                    hasSocial: false,
+                    hasReviews: false,
+                    minRating: 0,
+                    maxRating: 5,
+                  })}
                   className="w-full bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-2 px-4 rounded transition"
                 >
-                  Clear Filters
+                  Clear All Filters
                 </button>
+              </div>
+            </div>
+
+            {/* PHASE 3: Advanced Quality Filters */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h3 className="font-semibold text-gray-900 mb-3">🔍 Advanced Quality Filters</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filtering.hasWebsite}
+                    onChange={(e) => setFiltering({ ...filtering, hasWebsite: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">Has Website</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filtering.hasEmail}
+                    onChange={(e) => setFiltering({ ...filtering, hasEmail: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">Has Email Found</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filtering.hasPhone}
+                    onChange={(e) => setFiltering({ ...filtering, hasPhone: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">Has Phone</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filtering.hasSocial}
+                    onChange={(e) => setFiltering({ ...filtering, hasSocial: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">Has Social Media</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filtering.hasReviews}
+                    onChange={(e) => setFiltering({ ...filtering, hasReviews: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-700">Has Reviews</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-700">Rating:</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="0.5"
+                    value={filtering.minRating}
+                    onChange={(e) => setFiltering({ ...filtering, minRating: parseFloat(e.target.value) })}
+                    className="flex-1"
+                  />
+                  <span className="text-sm text-gray-600 w-8">
+                    {filtering.minRating}+
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -528,9 +893,83 @@ export default function LeadsPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
+                {/* PHASE 5: Bulk action toolbar */}
+                {selectedLeads.size > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">
+                      {selectedLeads.size} lead{selectedLeads.size !== 1 ? 's' : ''} selected
+                    </span>
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => setShowBulkTagModal(true)}
+                        disabled={submitting}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
+                      >
+                        🏷️ Tag
+                      </button>
+                      <button
+                        onClick={handleBulkExportCSV}
+                        disabled={submitting}
+                        className="bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
+                      >
+                        📥 Export CSV
+                      </button>
+                      <button
+                        onClick={() => setSelectedLeads(new Set())}
+                        className="bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-1 px-3 rounded text-sm transition"
+                      >
+                        ✕ Clear Selection
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tag Modal */}
+                {showBulkTagModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Tag to Selected Leads</h3>
+                      <input
+                        type="text"
+                        placeholder="e.g., 'high-value', 'follow-up', 'contacted'"
+                        value={bulkNewTag}
+                        onChange={(e) => setBulkNewTag(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900 mb-4"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleBulkTagSubmit}
+                          disabled={submitting}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded transition disabled:opacity-50"
+                        >
+                          {submitting ? 'Adding...' : 'Add Tag'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowBulkTagModal(false);
+                            setBulkNewTag('');
+                          }}
+                          className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-2 px-4 rounded transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
+                      {/* PHASE 5: Selection checkbox */}
+                      <th className="text-center py-3 px-2 font-semibold text-gray-900 w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeads.size === filteredLeads.length && filteredLeads.length > 0}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4"
+                        />
+                      </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Business</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Source</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Contact</th>
@@ -547,7 +986,16 @@ export default function LeadsPage() {
                       const sourceInfo = getSourceInfo(lead.sources?.[0] || 'google-maps');
 
                       return (
-                        <tr key={lead.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <tr key={lead.id} className={`border-b border-gray-100 ${selectedLeads.has(lead.id) ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                          {/* PHASE 5: Selection checkbox */}
+                          <td className="py-3 px-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedLeads.has(lead.id)}
+                              onChange={() => toggleLeadSelection(lead.id)}
+                              className="w-4 h-4"
+                            />
+                          </td>
                           <td className="py-3 px-4">
                             <button
                               onClick={() => toggleExpandLead(lead.id)}

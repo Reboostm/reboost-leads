@@ -96,6 +96,8 @@ export async function createLead(lead: Omit<Lead, 'id' | 'dateFound' | 'dateLast
     dateLastUpdated: Timestamp.now(),
     sources: lead.sources || [],
     status: lead.status || 'active',
+    tags: lead.tags || [], // PHASE 5: Initialize empty tags
+    ghlPushed: lead.ghlPushed || false, // PHASE 4: Initialize as not pushed
   };
 
   const docRef = await addDoc(collection(db, LEADS_COLLECTION), leadData);
@@ -239,6 +241,8 @@ export async function batchCreateLeads(
         dateLastUpdated: Timestamp.now(),
         sources: lead.sources || [],
         status: lead.status || 'active',
+        tags: lead.tags || [], // PHASE 5: Initialize empty tags
+        ghlPushed: lead.ghlPushed || false, // PHASE 4: Initialize as not pushed
       });
 
       newLeadIds.push(leadRef.id);
@@ -320,4 +324,68 @@ export async function getImportMetrics(days: number = 7): Promise<DailyImportMet
 
   // Sort by date descending and filter to last N days
   return metrics.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, days);
+}
+
+/**
+ * PHASE 1 & 5: Update lead tags
+ * Add or replace tags on a single lead
+ */
+export async function updateLeadTags(leadId: string, tags: string[]): Promise<void> {
+  const docRef = doc(db, LEADS_COLLECTION, leadId);
+  await updateDoc(docRef, {
+    tags,
+    dateLastUpdated: Timestamp.now(),
+  });
+}
+
+/**
+ * PHASE 5: Bulk update lead status
+ * Change status on multiple leads at once
+ */
+export async function updateLeadsStatus(
+  leadIds: string[],
+  status: 'active' | 'contacted' | 'converted' | 'rejected' | 'archived' | 'deleted'
+): Promise<void> {
+  const batch = writeBatch(db);
+
+  for (const leadId of leadIds) {
+    const docRef = doc(db, LEADS_COLLECTION, leadId);
+    batch.update(docRef, {
+      status,
+      dateLastUpdated: Timestamp.now(),
+    });
+  }
+
+  await batch.commit();
+}
+
+/**
+ * PHASE 1: Get searches by status
+ * Find all searches with a specific status
+ */
+export async function getSearchesByStatus(
+  status: 'active' | 'paused' | 'completed'
+): Promise<LeadSearch[]> {
+  const q = query(collection(db, SEARCHES_COLLECTION), where('status', '==', status));
+  const querySnapshot = await getDocs(q);
+  const searches: LeadSearch[] = [];
+
+  querySnapshot.forEach((doc) => {
+    searches.push({ id: doc.id, ...(doc.data() as Omit<LeadSearch, 'id'>) });
+  });
+
+  return searches;
+}
+
+/**
+ * PHASE 1: Mark search as completed
+ * When max leads quota is reached, mark the search as complete
+ */
+export async function markSearchCompleted(searchId: string, totalFound: number): Promise<void> {
+  const docRef = doc(db, SEARCHES_COLLECTION, searchId);
+  await updateDoc(docRef, {
+    status: 'completed',
+    completedDate: Timestamp.now(),
+    leadsFound: totalFound,
+  });
 }

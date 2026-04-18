@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { searchGoogleMapsBusinesses } from '../../../lib/apis/googleMaps';
 import { findEmailsFromDomain, extractDomainFromUrl } from '../../../lib/apis/hunter';
-import { batchCreateLeads, getLeadsCount } from '../../../lib/leads';
+import { batchCreateLeads, getLeadsCount, updateLeadSearch, markSearchCompleted, getLeadSearches } from '../../../lib/leads';
 import { Lead } from '../../../lib/types/lead';
 
 interface ExecuteSearchRequest {
@@ -16,6 +16,9 @@ interface ExecuteSearchRequest {
   state: string;
   city?: string;
   enrichWithEmails?: boolean; // Whether to use Hunter.io to find emails
+  // PHASE 1: Quota control
+  searchId?: string; // Search record ID for updating status
+  maxLeads?: number; // Maximum leads to find (default 100)
 }
 
 interface ExecuteSearchResponse {
@@ -60,7 +63,7 @@ export default async function handler(
     });
   }
 
-  const { niche, state, city, enrichWithEmails } = req.body as ExecuteSearchRequest;
+  const { niche, state, city, enrichWithEmails, searchId, maxLeads } = req.body as ExecuteSearchRequest;
 
   // Validation
   if (!niche || !state) {
@@ -71,19 +74,27 @@ export default async function handler(
     });
   }
 
+  // PHASE 1: Validate maxLeads
+  const MAX_LEADS_LIMIT = 500;
+  const finalMaxLeads = Math.min(maxLeads || 100, MAX_LEADS_LIMIT);
+
   try {
-    console.log(`[SEARCH] Starting search: ${niche} in ${city || state}`);
+    console.log(`[SEARCH] Starting search: ${niche} in ${city || state} (max: ${finalMaxLeads} leads)`);
 
     // Step 1: Search Google Maps
     const googleResults = await searchGoogleMapsBusinesses(niche, state, city);
     console.log(`[SEARCH] Found ${googleResults.leads.length} leads from Google Maps`);
 
-    // Step 2: Enrich with Hunter.io if enabled
-    let enrichedLeads = googleResults.leads;
+    // PHASE 1: Trim to maxLeads quota
+    const leadsToProcess = googleResults.leads.slice(0, finalMaxLeads);
+    console.log(`[SEARCH] Processing ${leadsToProcess.length} leads (limited to ${finalMaxLeads} max)`);
 
-    if (enrichWithEmails && googleResults.leads.length > 0) {
+    // Step 2: Enrich with Hunter.io if enabled
+    let enrichedLeads = leadsToProcess;
+
+    if (enrichWithEmails && leadsToProcess.length > 0) {
       console.log('[SEARCH] Enriching leads with Hunter.io...');
-      enrichedLeads = await enrichLeadsWithEmails(googleResults.leads);
+      enrichedLeads = await enrichLeadsWithEmails(leadsToProcess);
     }
 
     // Step 3: Batch create leads with deduplication
@@ -91,6 +102,24 @@ export default async function handler(
     console.log(
       `[SEARCH] Results - Created: ${batchResult.created}, Duplicates: ${batchResult.duplicates}, Failed: ${batchResult.failed}`
     );
+
+    // PHASE 1: Update search status if quota reached
+    if (searchId) {
+      const totalLeadsFound = (googleResults.leads.length || 0) + (batchResult.created || 0);
+
+      // If we found maxLeads or more from this run, mark search as completed
+      if (googleResults.leads.length >= finalMaxLeads) {
+        console.log(`[SEARCH] Quota reached (${finalMaxLeads}), marking search as completed`);
+        await markSearchCompleted(searchId, totalLeadsFound);
+      } else {
+        // Otherwise just update search stats
+        await updateLeadSearch(searchId, {
+          leadsFound: totalLeadsFound,
+          dateLastRun: new Date(),
+          searchCount: (await getLeadSearches()).find((s) => s.id === searchId)?.searchCount || 0 + 1,
+        });
+      }
+    }
 
     // Step 4: Get total count for this niche/state
     const totalLeads = await getLeadsCount(niche, state, city);

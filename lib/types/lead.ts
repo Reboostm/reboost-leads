@@ -55,11 +55,16 @@ export interface Lead {
   dateFound: Date; // When lead was first scraped
   dateLastUpdated: Date; // Last update date
   sources: string[]; // Where it came from: ["google-maps", "hunter.io", etc.]
-  status: 'active' | 'contacted' | 'archived' | 'deleted';
+  status: 'active' | 'contacted' | 'converted' | 'rejected' | 'archived' | 'deleted';
+
+  // User Annotations & Tags
+  tags: string[]; // User-added tags (e.g., ["high-value", "follow-up", "contacted"])
+  notes?: string; // Custom notes from user
 
   // GHL Integration
   ghlWorkflowId?: string;
   ghlCampaignId?: string;
+  ghlPushed: boolean; // Whether lead has been pushed to GoHighLevel
   ghlStatus?: string;
   dateGhlPushed?: Date;
 
@@ -78,11 +83,25 @@ export interface LeadSearch {
   niche: string; // e.g., "Landscaping"
   state: string; // e.g., "Utah"
   city?: string; // Optional: specific city
-  isActive: boolean;
-  dateCreated: Date;
-  dateLastRun?: Date;
+
+  // Status & Lifecycle
+  status: 'active' | 'paused' | 'completed'; // Replaces isActive
+  isActive?: boolean; // Legacy field for backward compatibility
+
+  // Quota Control (PHASE 1)
+  maxLeads: number; // Default 100, max 500 - limits results per run
   leadsFound: number; // Total leads found across all runs
   newLeadsToday?: number;
+  searchCount: number; // How many times this search has been executed
+  completedDate?: Date; // When search reached max leads quota
+
+  // Scheduling (PHASE 2)
+  scheduledTime?: string; // e.g., "09:00" for 9 AM
+  scheduledFrequency?: 'once' | 'daily'; // One-time or recurring
+
+  // Tracking
+  dateCreated: Date;
+  dateLastRun?: Date;
   nextRunTime?: Date;
 }
 

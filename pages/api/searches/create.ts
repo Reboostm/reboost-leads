@@ -11,7 +11,14 @@ interface CreateSearchRequest {
   niche: string;
   state: string;
   city?: string;
-  isActive: boolean;
+  isActive?: boolean; // Legacy field
+  // PHASE 1: Quota Control
+  status?: 'active' | 'paused' | 'completed';
+  maxLeads?: number;
+  searchCount?: number;
+  // PHASE 2: Scheduling
+  scheduledFrequency?: 'once' | 'daily';
+  scheduledTime?: string;
 }
 
 interface CreateSearchResponse {
@@ -37,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     // In production, verify sessionStorage or JWT
   }
 
-  const { niche, state, city, isActive } = req.body as CreateSearchRequest;
+  const { niche, state, city, isActive, status, maxLeads, searchCount, scheduledFrequency, scheduledTime } = req.body as CreateSearchRequest;
 
   // Validation
   if (!niche || !state) {
@@ -48,12 +55,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     });
   }
 
+  // Validate maxLeads if provided
+  if (maxLeads && (maxLeads < 1 || maxLeads > 500)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid maxLeads',
+      error: 'maxLeads must be between 1 and 500',
+    });
+  }
+
   try {
+    // Determine status (new system or legacy)
+    const finalStatus = status || (isActive !== false ? 'active' : 'paused');
+
     const searchId = await saveLeadSearch({
       niche: niche.trim(),
       state: state.trim(),
       city: city?.trim(),
-      isActive: isActive !== false,
+      // PHASE 1: Status and quota control
+      status: finalStatus,
+      maxLeads: maxLeads || 100, // Default 100
+      searchCount: searchCount || 0,
+      // PHASE 2: Scheduling
+      scheduledFrequency,
+      scheduledTime: scheduledFrequency === 'daily' ? scheduledTime : undefined,
+      // Backward compatibility
+      isActive: finalStatus === 'active',
       dateCreated: new Date(),
       leadsFound: 0,
     });
@@ -67,7 +94,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         niche,
         state,
         city,
-        isActive: isActive !== false,
+        status: finalStatus,
+        maxLeads: maxLeads || 100,
+        searchCount: searchCount || 0,
+        scheduledFrequency,
+        scheduledTime: scheduledFrequency === 'daily' ? scheduledTime : undefined,
+        isActive: finalStatus === 'active',
         dateCreated: new Date(),
         leadsFound: 0,
       },
