@@ -208,3 +208,105 @@ export async function assignLeadToWorkflow(
     return false;
   }
 }
+
+/**
+ * Get available campaigns from GHL (email sequences)
+ */
+export async function getGHLCampaigns(config: GHLConfig): Promise<
+  Array<{
+    id: string;
+    name: string;
+    type?: string;
+    status?: string;
+  }>
+> {
+  try {
+    const baseUrl = config.baseUrl || 'https://rest.gohighlevel.com/v1';
+
+    const response = await fetch(`${baseUrl}/locations/${config.locationId}/campaigns`, {
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('Failed to fetch campaigns:', response.statusText);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.campaigns || [];
+  } catch (error) {
+    console.error('[GHL] Error fetching campaigns:', error);
+    return [];
+  }
+}
+
+/**
+ * Add contact to a GHL email campaign
+ */
+export async function addContactToCampaign(
+  contactId: string,
+  campaignId: string,
+  config: GHLConfig
+): Promise<boolean> {
+  try {
+    const baseUrl = config.baseUrl || 'https://rest.gohighlevel.com/v1';
+
+    const response = await fetch(`${baseUrl}/contacts/${contactId}/campaigns/${campaignId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add to campaign: ${response.statusText}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[GHL] Error adding to campaign:', error);
+    return false;
+  }
+}
+
+/**
+ * Get contact engagement data (email opens, clicks, etc.)
+ */
+export async function getContactEngagement(
+  contactId: string,
+  config: GHLConfig
+): Promise<{
+  emailsOpened: number;
+  emailsClicked: number;
+  lastEmailOpenDate?: string;
+  lastInteractionDate?: string;
+} | null> {
+  try {
+    const baseUrl = config.baseUrl || 'https://rest.gohighlevel.com/v1';
+
+    const response = await fetch(`${baseUrl}/contacts/${contactId}`, {
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const contact = data.contact || {};
+
+    return {
+      emailsOpened: contact.emailsOpened || 0,
+      emailsClicked: contact.emailsClicked || 0,
+      lastEmailOpenDate: contact.lastEmailOpenDate,
+      lastInteractionDate: contact.lastInteractionDate,
+    };
+  } catch (error) {
+    console.error('[GHL] Error fetching engagement:', error);
+    return null;
+  }
+}

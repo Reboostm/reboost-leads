@@ -11,14 +11,20 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { updateLeadTags, updateLeadsStatus } from '../../../lib/leads';
+import { updateLeadTags, updateLeadsStatus, getLeads } from '../../../lib/leads';
 import { writeBatch, doc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { addContactToCampaign } from '../../../lib/ghl';
 
 interface BulkActionRequest {
   leadIds: string[];
   action: 'tag' | 'status' | 'ghl-push' | 'archive';
   value?: string; // For tag or status
+  ghlConfig?: {
+    apiKey: string;
+    locationId: string;
+    campaignId?: string; // Email campaign to add leads to
+  };
 }
 
 interface BulkActionResponse {
@@ -118,26 +124,84 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       }
 
       case 'ghl-push': {
-        // This would integrate with GoHighLevel
-        // For now, just mark as pushed
+        const { ghlConfig } = req.body as BulkActionRequest;
+
+        if (!ghlConfig || !ghlConfig.apiKey || !ghlConfig.locationId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid request',
+            error: 'ghlConfig with apiKey and locationId is required for ghl-push',
+          });
+        }
+
+        // Get all the leads to push
+        const allLeads = await getLeads();
+        const leadsToAdd = allLeads.filter((lead) => leadIds.includes(lead.id));
+
+        if (leadsToAdd.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No leads found',
+            error: 'Could not find any leads to push',
+          });
+        }
+
+        // Push to GHL and add to campaign if specified
+        let successCount = 0;
+        let failureCount = 0;
         const batch = writeBatch(db);
         const LEADS_COLLECTION = 'leads';
 
-        for (const leadId of leadIds) {
-          const docRef = doc(db, LEADS_COLLECTION, leadId);
-          batch.update(docRef, {
-            ghlPushed: true,
-            dateGhlPushed: Timestamp.now(),
-            dateLastUpdated: Timestamp.now(),
-          });
+        for (const lead of leadsToAdd) {
+          try {
+            // Add to campaign if specified
+            if (ghlConfig.campaignId && lead.ghlContactId) {
+              const campaignSuccess = await addContactToCampaign(
+                lead.ghlContactId,
+                ghlConfig.campaignId,
+                {
+                  apiKey: ghlConfig.apiKey,
+                  locationId: ghlConfig.locationId,
+                }
+              );
+
+              if (campaignSuccess) {
+                successCount++;
+                const docRef = doc(db, LEADS_COLLECTION, lead.id);
+                batch.update(docRef, {
+                  ghlCampaignId: ghlConfig.campaignId,
+                  ghlPushed: true,
+                  dateGhlPushed: Timestamp.now(),
+                  dateLastUpdated: Timestamp.now(),
+                });
+              } else {
+                failureCount++;
+              }
+            } else {
+              // Just mark as pushed without campaign assignment
+              successCount++;
+              const docRef = doc(db, LEADS_COLLECTION, lead.id);
+              batch.update(docRef, {
+                ghlPushed: true,
+                dateGhlPushed: Timestamp.now(),
+                dateLastUpdated: Timestamp.now(),
+              });
+            }
+
+            // Rate limiting
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          } catch (error) {
+            failureCount++;
+            console.error(`Error pushing lead ${lead.id}:`, error);
+          }
         }
 
         await batch.commit();
 
         return res.status(200).json({
-          success: true,
-          message: `Marked ${leadIds.length} leads as pushed to GoHighLevel`,
-          updatedCount: leadIds.length,
+          success: failureCount === 0,
+          message: `Pushed ${successCount} leads to GoHighLevel${ghlConfig.campaignId ? ' and added to campaign' : ''}${failureCount > 0 ? ` (${failureCount} failed)` : ''}`,
+          updatedCount: successCount,
         });
       }
 

@@ -54,6 +54,12 @@ export default function LeadsPage() {
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [showBulkTagModal, setShowBulkTagModal] = useState(false);
   const [bulkNewTag, setBulkNewTag] = useState('');
+  // PHASE 4 Enhancement: GHL campaign selection
+  const [showGHLModal, setShowGHLModal] = useState(false);
+  const [ghlCampaigns, setGHLCampaigns] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedGHLCampaign, setSelectedGHLCampaign] = useState('');
+  const [ghlApiKey, setGHLApiKey] = useState('');
+  const [ghlLocationId, setGHLLocationId] = useState('');
 
   // Check authentication
   useEffect(() => {
@@ -368,6 +374,77 @@ export default function LeadsPage() {
     window.URL.revokeObjectURL(url);
 
     setSelectedLeads(new Set());
+  };
+
+  const fetchGHLCampaigns = async () => {
+    if (!ghlApiKey || !ghlLocationId) {
+      alert('Please enter GHL API key and Location ID');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/ghl/campaigns?ghlApiKey=${encodeURIComponent(ghlApiKey)}&ghlLocationId=${encodeURIComponent(ghlLocationId)}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch campaigns');
+      }
+
+      const data = await response.json();
+      setGHLCampaigns(data.campaigns || []);
+
+      if (data.campaigns.length === 0) {
+        alert('No campaigns found. Please create one in GoHighLevel first.');
+      }
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      alert('Error fetching campaigns. Please check your API key and Location ID.');
+    }
+  };
+
+  const handlePushToGHL = async () => {
+    if (!ghlApiKey || !ghlLocationId) {
+      alert('Please enter GHL API key and Location ID');
+      return;
+    }
+
+    if (selectedLeads.size === 0) {
+      alert('Please select leads to push to GHL');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch('/api/ghl/push-leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadIds: Array.from(selectedLeads),
+          campaignId: selectedGHLCampaign || undefined,
+          ghlApiKey,
+          ghlLocationId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(
+          `Successfully pushed ${data.successCount} leads to GoHighLevel${selectedGHLCampaign ? ' and added to email campaign' : ''}`
+        );
+        setShowGHLModal(false);
+        setSelectedLeads(new Set());
+        setSelectedGHLCampaign('');
+      } else {
+        alert(`Error: ${data.error || 'Failed to push leads'}`);
+      }
+    } catch (error) {
+      console.error('Error pushing to GHL:', error);
+      alert('Error pushing leads to GHL');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -908,6 +985,13 @@ export default function LeadsPage() {
                         🏷️ Tag
                       </button>
                       <button
+                        onClick={() => setShowGHLModal(true)}
+                        disabled={submitting}
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
+                      >
+                        📧 Send Email (GHL)
+                      </button>
+                      <button
                         onClick={handleBulkExportCSV}
                         disabled={submitting}
                         className="bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
@@ -948,6 +1032,94 @@ export default function LeadsPage() {
                           onClick={() => {
                             setShowBulkTagModal(false);
                             setBulkNewTag('');
+                          }}
+                          className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-2 px-4 rounded transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* GHL Campaign Modal */}
+                {showGHLModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        📧 Push {selectedLeads.size} Leads to GHL Email Campaign
+                      </h3>
+
+                      {/* API Credentials */}
+                      <div className="space-y-4 mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-900">
+                          ℹ️ Enter your GoHighLevel credentials to push leads and assign them to an email campaign.
+                        </p>
+                        <input
+                          type="password"
+                          placeholder="GHL API Key"
+                          value={ghlApiKey}
+                          onChange={(e) => setGHLApiKey(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="GHL Location ID"
+                          value={ghlLocationId}
+                          onChange={(e) => setGHLLocationId(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 text-sm"
+                        />
+                        <button
+                          onClick={fetchGHLCampaigns}
+                          disabled={submitting || !ghlApiKey || !ghlLocationId}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded transition disabled:opacity-50 text-sm"
+                        >
+                          Load Campaigns
+                        </button>
+                      </div>
+
+                      {/* Campaign Selection */}
+                      {ghlCampaigns.length > 0 && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Email Campaign (Optional)
+                          </label>
+                          <select
+                            value={selectedGHLCampaign}
+                            onChange={(e) => setSelectedGHLCampaign(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900"
+                          >
+                            <option value="">
+                              -- Skip Campaign Selection --
+                            </option>
+                            {ghlCampaigns.map((campaign) => (
+                              <option key={campaign.id} value={campaign.id}>
+                                {campaign.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Select a campaign to automatically add these leads to your email sequence.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handlePushToGHL}
+                          disabled={submitting || !ghlApiKey || !ghlLocationId}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded transition disabled:opacity-50"
+                        >
+                          {submitting ? 'Pushing...' : '✓ Push to GHL'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowGHLModal(false);
+                            setGHLApiKey('');
+                            setGHLLocationId('');
+                            setGHLCampaigns([]);
+                            setSelectedGHLCampaign('');
                           }}
                           className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-2 px-4 rounded transition"
                         >

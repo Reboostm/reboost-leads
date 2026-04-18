@@ -63,10 +63,17 @@ export interface Lead {
 
   // GHL Integration
   ghlWorkflowId?: string;
-  ghlCampaignId?: string;
+  ghlCampaignId?: string; // Email campaign ID in GHL
+  ghlContactId?: string; // GHL contact ID
   ghlPushed: boolean; // Whether lead has been pushed to GoHighLevel
   ghlStatus?: string;
   dateGhlPushed?: Date;
+
+  // Email Engagement (from GHL)
+  emailsOpened?: number; // Number of emails opened in GHL campaign
+  emailsClicked?: number; // Number of links clicked in emails
+  lastEmailOpenDate?: Date; // When lead last opened an email
+  ghlEngagementLevel?: 'none' | 'opened' | 'clicked' | 'replied'; // Highest engagement level
 
   // Tracking & Analytics
   lastContactAttempt?: Date;

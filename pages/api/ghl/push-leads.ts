@@ -8,11 +8,12 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getLead, updateLead } from '../../../lib/leads';
-import { pushLeadsToGHL, getGHLWorkflows } from '../../../lib/ghl';
+import { pushLeadsToGHL, getGHLWorkflows, addContactToCampaign } from '../../../lib/ghl';
 
 interface PushLeadsRequest {
   leadIds: string[];
   workflowId?: string;
+  campaignId?: string; // Email campaign to add leads to
   ghlApiKey: string;
   ghlLocationId: string;
 }
@@ -35,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     });
   }
 
-  const { leadIds, workflowId, ghlApiKey, ghlLocationId } = req.body as PushLeadsRequest;
+  const { leadIds, workflowId, campaignId, ghlApiKey, ghlLocationId } = req.body as PushLeadsRequest;
 
   // Validation
   if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
@@ -55,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 
   try {
-    console.log(`[GHL] Pushing ${leadIds.length} leads to GoHighLevel...`);
+    console.log(`[GHL] Pushing ${leadIds.length} leads to GoHighLevel${campaignId ? ` to campaign ${campaignId}` : ''}...`);
 
     // Fetch all leads
     const leads = [];
@@ -82,22 +83,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     console.log(`[GHL] Push complete: ${result.successCount} successful, ${result.failureCount} failed`);
 
-    // Update leads in database to mark as pushed
-    for (const leadId of leadIds) {
+    // Update leads in database to mark as pushed and add to campaign
+    for (let i = 0; i < result.results.length; i++) {
+      const pushResult = result.results[i];
+      const lead = leads[i];
+
       try {
-        await updateLead(leadId, {
+        const updateData: any = {
           ghlPushed: true,
           dateGhlPushed: new Date(),
-          ghlStatus: 'pushed',
-        });
+          ghlStatus: pushResult.success ? 'pushed' : 'failed',
+        };
+
+        // Store contact ID if push was successful
+        if (pushResult.success && pushResult.contactId) {
+          updateData.ghlContactId = pushResult.contactId;
+
+          // Add to campaign if specified
+          if (campaignId) {
+            const campaignSuccess = await addContactToCampaign(
+              pushResult.contactId,
+              campaignId,
+              {
+                apiKey: ghlApiKey,
+                locationId: ghlLocationId,
+              }
+            );
+
+            if (campaignSuccess) {
+              updateData.ghlCampaignId = campaignId;
+              updateData.ghlEngagementLevel = 'none'; // Initialize engagement level
+              console.log(`[GHL] Added contact ${pushResult.contactId} to campaign ${campaignId}`);
+            } else {
+              console.warn(`[GHL] Failed to add contact ${pushResult.contactId} to campaign ${campaignId}`);
+            }
+          }
+        }
+
+        await updateLead(lead.id, updateData);
       } catch (error) {
-        console.warn(`[GHL] Failed to update lead ${leadId} in database:`, error);
+        console.warn(`[GHL] Failed to update lead ${lead.id} in database:`, error);
       }
     }
 
     return res.status(200).json({
       success: true,
-      message: `Pushed ${result.successCount} leads to GoHighLevel${result.failureCount > 0 ? ` (${result.failureCount} failed)` : ''}`,
+      message: `Pushed ${result.successCount} leads to GoHighLevel${campaignId ? ' and added to email campaign' : ''}${result.failureCount > 0 ? ` (${result.failureCount} failed)` : ''}`,
       successCount: result.successCount,
       failureCount: result.failureCount,
     });
