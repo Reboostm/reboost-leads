@@ -14,7 +14,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
       if (!currentUser) {
         router.push('/login');
       } else {
@@ -28,7 +28,7 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut(auth());
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);

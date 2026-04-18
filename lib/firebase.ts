@@ -10,24 +10,39 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase - safe for both server and client
-const apps = getApps();
-let app;
-if (apps.length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = apps[0];
-}
+let authInstance: Auth | null = null;
 
-const auth: Auth = getAuth(app);
-
-// Connect to Auth emulator in development (optional) - only in browser
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  try {
-    connectAuthEmulator(auth!, 'http://localhost:9099', { disableWarnings: true });
-  } catch (error) {
-    // Emulator may already be connected
+// Lazy initialization - only initialize when first called (in browser)
+export function getAuthInstance(): Auth {
+  if (authInstance) {
+    return authInstance;
   }
+
+  if (typeof window === 'undefined') {
+    throw new Error('Firebase Auth can only be used in the browser');
+  }
+
+  const apps = getApps();
+  let app;
+  if (apps.length === 0) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = apps[0];
+  }
+
+  authInstance = getAuth(app);
+
+  // Connect to Auth emulator in development (optional)
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      connectAuthEmulator(authInstance, 'http://localhost:9099', { disableWarnings: true });
+    } catch (error) {
+      // Emulator may already be connected
+    }
+  }
+
+  return authInstance;
 }
 
-export { auth };
+// Re-export for convenience - this won't be evaluated until getAuthInstance() is called
+export { getAuthInstance as auth };

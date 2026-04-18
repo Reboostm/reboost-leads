@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   // Check authentication state on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
       setUser(currentUser);
       setCheckingAuth(false);
       if (currentUser) {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth(), email, password);
       if (result.user) {
         setEmail('');
         setPassword('');
@@ -64,7 +64,7 @@ export default function LoginPage() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut(auth());
       setEmail('');
       setPassword('');
     } catch (err: any) {
