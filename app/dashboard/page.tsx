@@ -1,45 +1,30 @@
 'use client';
 
-// This component must be dynamic to avoid prerendering issues with Firebase
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
-    try {
-      const unsubscribe = onAuthStateChanged(auth(), (currentUser) => {
-        if (!currentUser) {
-          router.push('/login');
-        } else {
-          setUser(currentUser);
-        }
-        setLoading(false);
-      });
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error('Auth state change error:', error);
+    if (typeof window !== 'undefined') {
+      const authed = sessionStorage.getItem('reboost_auth') === 'true';
+      if (!authed) {
+        router.push('/login');
+      } else {
+        setIsAuthed(true);
+      }
       setLoading(false);
-      // Redirect to login if auth fails
-      router.push('/login');
     }
   }, [router]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth());
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('reboost_auth');
     }
+    router.push('/login');
   };
 
   if (loading) {
@@ -53,7 +38,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
+  if (!isAuthed) {
     return null;
   }
 
@@ -73,23 +58,20 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Welcome!</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Welcome to ReBoot Leads!</h2>
           <div className="space-y-3">
             <p className="text-gray-700">
-              <span className="font-medium">Logged in as:</span> {user.email}
+              You are now logged into the ReBoot Leads admin portal.
             </p>
             <p className="text-gray-700">
-              <span className="font-medium">User ID:</span> {user.uid}
-            </p>
-            <p className="text-gray-700">
-              <span className="font-medium">Account created:</span> {new Date(user.metadata?.creationTime).toLocaleString()}
+              This is your dashboard where you can manage leads and configure the lead generation system.
             </p>
           </div>
 
           <div className="mt-8 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
             <h3 className="font-semibold text-indigo-900 mb-2">✓ Authentication Working</h3>
             <p className="text-indigo-800 text-sm">
-              Firebase authentication is properly configured and working. You can now build out the lead generation features!
+              Authentication is properly configured and working. You can now build out the lead generation features!
             </p>
           </div>
         </div>
