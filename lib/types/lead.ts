@@ -3,6 +3,16 @@
  * Captures comprehensive contact and business information for outreach
  */
 
+export interface Activity {
+  id: string;
+  leadId: string;
+  type: 'created' | 'tagged' | 'status_changed' | 'ghl_pushed' | 'email_sent' | 'email_opened' | 'email_clicked' | 'note_added' | 'scored' | 'campaign_added';
+  description: string;
+  metadata?: Record<string, any>; // e.g., { tag: 'high-value', oldStatus: 'active', newStatus: 'contacted' }
+  timestamp: Date;
+  userId?: string; // Who performed the action
+}
+
 export interface Lead {
   // Unique Identifiers
   id: string; // Firestore document ID

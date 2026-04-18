@@ -19,12 +19,13 @@ import {
   DocumentData,
   QueryConstraint,
 } from 'firebase/firestore';
-import { Lead, LeadSearch, DailyImportMetrics } from './types/lead';
+import { Lead, LeadSearch, DailyImportMetrics, Activity } from './types/lead';
 import { generateFingerprint, normalizeEmail, normalizePhone } from './deduplication';
 
 const LEADS_COLLECTION = 'leads';
 const SEARCHES_COLLECTION = 'lead_searches';
 const METRICS_COLLECTION = 'import_metrics';
+const ACTIVITIES_COLLECTION = 'lead_activities';
 
 /**
  * Check if a lead already exists (deduplication check)
@@ -388,4 +389,79 @@ export async function markSearchCompleted(searchId: string, totalFound: number):
     completedDate: Timestamp.now(),
     leadsFound: totalFound,
   });
+}
+
+/**
+ * Activity Logging Functions
+ * Track all interactions with leads for audit trail and analytics
+ */
+
+/**
+ * Log an activity for a lead
+ */
+export async function logActivity(
+  leadId: string,
+  type: Activity['type'],
+  description: string,
+  metadata?: Record<string, any>
+): Promise<string> {
+  const activity: Omit<Activity, 'id'> = {
+    leadId,
+    type,
+    description,
+    metadata,
+    timestamp: new Date(),
+  };
+
+  const docRef = await addDoc(collection(db, ACTIVITIES_COLLECTION), activity);
+  return docRef.id;
+}
+
+/**
+ * Get activity log for a specific lead
+ */
+export async function getLeadActivities(leadId: string): Promise<Activity[]> {
+  const q = query(
+    collection(db, ACTIVITIES_COLLECTION),
+    where('leadId', '==', leadId)
+  );
+  const querySnapshot = await getDocs(q);
+  const activities: Activity[] = [];
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    activities.push({
+      id: doc.id,
+      ...(data as Omit<Activity, 'id'>),
+      timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date(data.timestamp),
+    });
+  });
+
+  // Sort by timestamp descending (newest first)
+  return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+}
+
+/**
+ * Get recent activities across all leads
+ */
+export async function getRecentActivities(limit: number = 50): Promise<Activity[]> {
+  const q = query(
+    collection(db, ACTIVITIES_COLLECTION)
+  );
+  const querySnapshot = await getDocs(q);
+  const activities: Activity[] = [];
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    activities.push({
+      id: doc.id,
+      ...(data as Omit<Activity, 'id'>),
+      timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date(data.timestamp),
+    });
+  });
+
+  // Sort by timestamp descending and limit
+  return activities
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, limit);
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lead, LeadSearch } from '../../../lib/types/lead';
 import { US_STATES, NICHES, LEAD_SOURCES, LEAD_STATUSES, getSourceInfo, getStatusLabel, API_EXPLANATIONS, STATUS_HELP } from '../../../lib/constants';
+import { calculateLeadScore } from '../../../lib/scoring';
 
 interface DailyMetrics {
   date: string;
@@ -25,6 +26,7 @@ export default function LeadsPage() {
   const [searches, setSearches] = useState<LeadSearch[]>([]);
   const [metrics, setMetrics] = useState<DailyMetrics | null>(null);
   const [showNewSearchForm, setShowNewSearchForm] = useState(false);
+  const [currentTab, setCurrentTab] = useState<'leads' | 'searches' | 'analytics'>('leads');
   const [searchFormData, setSearchFormData] = useState({
     niche: '',
     state: '',
@@ -34,6 +36,8 @@ export default function LeadsPage() {
     scheduledFrequency: 'once' as 'once' | 'daily', // PHASE 2: Scheduling
     scheduledTime: '09:00', // PHASE 2: Scheduling
   });
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [selectedLeadForActivity, setSelectedLeadForActivity] = useState<string | null>(null);
   const [filtering, setFiltering] = useState({
     niche: 'all',
     state: '',
@@ -80,6 +84,7 @@ export default function LeadsPage() {
       fetchSearches();
       fetchMetrics();
       calculateNicheStats();
+      fetchAnalytics();
     }
   }, [isAuthed]);
 
@@ -97,6 +102,18 @@ export default function LeadsPage() {
       }
     } catch (error) {
       console.error('Error fetching searches:', error);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const response = await fetch('/api/analytics/dashboard');
+      if (response.ok) {
+        const data = await response.json();
+        setAnalytics(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
     }
   };
 
@@ -447,6 +464,44 @@ export default function LeadsPage() {
     }
   };
 
+  const getScoreGradeColor = (grade: string) => {
+    switch (grade) {
+      case 'A+':
+        return 'bg-green-500 text-white';
+      case 'A':
+        return 'bg-green-400 text-white';
+      case 'B':
+        return 'bg-blue-400 text-white';
+      case 'C':
+        return 'bg-yellow-400 text-white';
+      case 'D':
+        return 'bg-orange-400 text-white';
+      case 'F':
+        return 'bg-red-500 text-white';
+      default:
+        return 'bg-gray-400 text-white';
+    }
+  };
+
+  const getScoreGradeIcon = (grade: string) => {
+    switch (grade) {
+      case 'A+':
+        return '🔥';
+      case 'A':
+        return '✅';
+      case 'B':
+        return '👍';
+      case 'C':
+        return '⚠️';
+      case 'D':
+        return '❌';
+      case 'F':
+        return '🚫';
+      default:
+        return '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -512,7 +567,44 @@ export default function LeadsPage() {
           </div>
         )}
 
+        {/* Tab Navigation */}
+        <div className="mb-6 border-b border-gray-200">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setCurrentTab('leads')}
+              className={`py-3 px-4 font-medium border-b-2 transition ${
+                currentTab === 'leads'
+                  ? 'text-indigo-600 border-indigo-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              📋 Leads Database
+            </button>
+            <button
+              onClick={() => setCurrentTab('searches')}
+              className={`py-3 px-4 font-medium border-b-2 transition ${
+                currentTab === 'searches'
+                  ? 'text-indigo-600 border-indigo-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              🔍 Active Searches
+            </button>
+            <button
+              onClick={() => setCurrentTab('analytics')}
+              className={`py-3 px-4 font-medium border-b-2 transition ${
+                currentTab === 'analytics'
+                  ? 'text-indigo-600 border-indigo-600'
+                  : 'text-gray-600 border-transparent hover:text-gray-900'
+              }`}
+            >
+              📊 Analytics
+            </button>
+          </div>
+        </div>
+
         {/* Active Searches */}
+        {currentTab === 'searches' && (
         <div className="bg-white rounded-lg shadow mb-8">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Active Searches</h2>
@@ -800,8 +892,10 @@ export default function LeadsPage() {
             )}
           </div>
         </div>
+        )}
 
         {/* Leads Database */}
+        {currentTab === 'leads' && (
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Leads Database</h2>
@@ -1143,6 +1237,7 @@ export default function LeadsPage() {
                         />
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Business</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-900">Score</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Source</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Contact</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-900">Website</th>
@@ -1175,6 +1270,19 @@ export default function LeadsPage() {
                             >
                               {isExpanded ? '▼' : '▶'} {lead.businessName}
                             </button>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {(() => {
+                              const score = calculateLeadScore(lead);
+                              return (
+                                <div className="flex flex-col items-center">
+                                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${getScoreGradeColor(score.grade)}`}>
+                                    {getScoreGradeIcon(score.grade)} {score.grade}
+                                  </span>
+                                  <span className="text-xs text-gray-600 mt-1">{score.totalScore}/100</span>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="py-3 px-4">
                             <span
@@ -1390,6 +1498,112 @@ export default function LeadsPage() {
             )}
           </div>
         </div>
+        )}
+
+        {/* Analytics Dashboard */}
+        {currentTab === 'analytics' && analytics && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Leads</h3>
+              <p className="text-3xl font-bold text-indigo-600">{analytics.summary.totalLeads}</p>
+              <p className="text-xs text-gray-500 mt-2">Across all searches</p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">Searches</h3>
+              <p className="text-3xl font-bold text-blue-600">{analytics.summary.totalSearches}</p>
+              <p className="text-xs text-gray-500 mt-2">Avg {analytics.summary.avgLeadsPerSearch}/search</p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">Pushed to GHL</h3>
+              <p className="text-3xl font-bold text-green-600">{analytics.conversionFunnel.pushedToGHL}</p>
+              <p className="text-xs text-gray-500 mt-2">Ready for outreach</p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-sm font-semibold text-gray-600 mb-2">Email Opens</h3>
+              <p className="text-3xl font-bold text-purple-600">{analytics.engagementMetrics.emailOpenRate}%</p>
+              <p className="text-xs text-gray-500 mt-2">Open rate</p>
+            </div>
+          </div>
+
+          {/* Quality Breakdown */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Lead Quality Breakdown</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Has Email</p>
+                <p className="text-2xl font-bold text-indigo-600">{analytics.qualityBreakdown.hasEmail}</p>
+                <p className="text-xs text-gray-500">{Math.round((analytics.qualityBreakdown.hasEmail / analytics.summary.totalLeads) * 100)}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Has Phone</p>
+                <p className="text-2xl font-bold text-blue-600">{analytics.qualityBreakdown.hasPhone}</p>
+                <p className="text-xs text-gray-500">{Math.round((analytics.qualityBreakdown.hasPhone / analytics.summary.totalLeads) * 100)}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Has Website</p>
+                <p className="text-2xl font-bold text-green-600">{analytics.qualityBreakdown.hasWebsite}</p>
+                <p className="text-xs text-gray-500">{Math.round((analytics.qualityBreakdown.hasWebsite / analytics.summary.totalLeads) * 100)}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Has Social</p>
+                <p className="text-2xl font-bold text-purple-600">{analytics.qualityBreakdown.hasSocial}</p>
+                <p className="text-xs text-gray-500">{Math.round((analytics.qualityBreakdown.hasSocial / analytics.summary.totalLeads) * 100)}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Has Reviews</p>
+                <p className="text-2xl font-bold text-orange-600">{analytics.qualityBreakdown.hasReviews}</p>
+                <p className="text-xs text-gray-500">{Math.round((analytics.qualityBreakdown.hasReviews / analytics.summary.totalLeads) * 100)}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Verified Email</p>
+                <p className="text-2xl font-bold text-red-600">{analytics.qualityBreakdown.verifiedEmail}</p>
+                <p className="text-xs text-gray-500">{Math.round((analytics.qualityBreakdown.verifiedEmail / analytics.summary.totalLeads) * 100)}%</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Score Distribution */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">🎯 Lead Score Distribution</h3>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {Object.entries(analytics.scoreDistribution).map(([grade, count]) => (
+                <div key={grade} className="text-center">
+                  <p className="text-xs text-gray-600 mb-1">Grade {grade}</p>
+                  <p className="text-2xl font-bold">{count}</p>
+                  <p className="text-xs text-gray-500">{Math.round((count / analytics.summary.totalLeads) * 100)}%</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Top Niches */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">🏆 Top Performing Niches</h3>
+            <div className="space-y-3">
+              {analytics.topNiches.slice(0, 5).map((niche) => (
+                <div key={niche.niche} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <div>
+                    <p className="font-medium text-gray-900">{niche.niche}</p>
+                    <p className="text-sm text-gray-600">{niche.leads} leads | Avg score: {niche.avgScore}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-indigo-600 h-2 rounded-full"
+                        style={{
+                          width: `${(niche.leads / analytics.summary.totalLeads) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        )}
       </main>
     </div>
   );
