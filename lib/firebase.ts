@@ -1,4 +1,4 @@
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, connectAuthEmulator, Auth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -10,26 +10,23 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
-let auth: Auth;
+// Initialize Firebase - safe for both server and client
+const apps = getApps();
+let app;
+if (apps.length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = apps[0];
+}
 
-// Only initialize in browser
-if (typeof window !== 'undefined') {
-  const apps = getApps();
-  if (apps.length === 0) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = apps[0];
-  }
-  auth = getAuth(app);
+const auth: Auth = getAuth(app);
 
-  // Connect to Auth emulator in development (optional)
-  if (process.env.NODE_ENV === 'development') {
-    try {
-      connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-    } catch (error) {
-      // Emulator may already be connected
-    }
+// Connect to Auth emulator in development (optional) - only in browser
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  try {
+    connectAuthEmulator(auth!, 'http://localhost:9099', { disableWarnings: true });
+  } catch (error) {
+    // Emulator may already be connected
   }
 }
 
