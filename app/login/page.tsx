@@ -63,7 +63,7 @@ export default function LoginPage() {
               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">ReBoot Leads</h1>
+          <h1 className="text-3xl font-bold text-gray-900">ReBoost Leads</h1>
           <p className="text-gray-600 mt-2">Lead Generation Platform</p>
         </div>
 
@@ -75,7 +75,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 text-gray-900"
               required
               disabled={loading}
             />
