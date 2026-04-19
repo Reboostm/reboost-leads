@@ -143,22 +143,11 @@ export const NICHES = [
   'Drywall & Insulation',
 
   // Legal Services
-  'Divorce Lawyers',
-  'Family Law - Custody & Adoption',
-  'Bankruptcy Lawyers',
-  'Personal Injury Lawyers',
-  'Criminal Defense Lawyers',
-  'DUI / Traffic Lawyers',
-  'Employment Lawyers',
-  'Workers Compensation Lawyers',
-  'Real Estate Lawyers',
-  'Estate Planning Lawyers',
-  'Medical Malpractice Lawyers',
-  'Product Liability Lawyers',
-  'Intellectual Property Lawyers',
-  'Corporate & Business Lawyers',
-  'Contract Lawyers',
-  'Immigration Lawyers',
+  'Lawyer - Divorce & Family Law',
+  'Lawyer - Bankruptcy',
+  'Lawyer - Personal Injury',
+  'Lawyer - Criminal Defense',
+  'Lawyer - DUI & Traffic',
 
   // Catch-all
   'Custom',

@@ -210,6 +210,9 @@ export default function LeadsPage() {
 
     setSubmitting(true);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
       const response = await fetch('/api/scrape/execute-search', {
         method: 'POST',
         headers: {
@@ -220,20 +223,86 @@ export default function LeadsPage() {
           state: search.state,
           city: search.city,
           enrichWithEmails: true,
+          searchId: search.id,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const result = await response.json();
         alert(`Found ${result.results.newLeadsAdded} new leads!`);
         fetchSearches();
         fetchMetrics();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Search error:', errorData);
+        alert(`Search failed: ${errorData.message || 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Error executing search:', error);
-      alert('Error executing search');
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        alert('Search timed out. Please try again.');
+      } else {
+        console.error('Error executing search:', error);
+        alert(`Error executing search: ${error.message}`);
+      }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePauseSearch = async (searchId: string) => {
+    try {
+      const response = await fetch('/api/searches/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchId, status: 'paused' }),
+      });
+      if (response.ok) {
+        fetchSearches();
+      } else {
+        alert('Failed to pause search');
+      }
+    } catch (error) {
+      console.error('Error pausing search:', error);
+      alert('Failed to pause search');
+    }
+  };
+
+  const handleResumeSearch = async (searchId: string) => {
+    try {
+      const response = await fetch('/api/searches/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchId, status: 'active' }),
+      });
+      if (response.ok) {
+        fetchSearches();
+      } else {
+        alert('Failed to resume search');
+      }
+    } catch (error) {
+      console.error('Error resuming search:', error);
+      alert('Failed to resume search');
+    }
+  };
+
+  const handleCompleteSearch = async (searchId: string) => {
+    try {
+      const response = await fetch('/api/searches/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchId, status: 'completed' }),
+      });
+      if (response.ok) {
+        fetchSearches();
+      } else {
+        alert('Failed to mark search complete');
+      }
+    } catch (error) {
+      console.error('Error completing search:', error);
+      alert('Failed to mark search complete');
     }
   };
 
@@ -866,25 +935,51 @@ export default function LeadsPage() {
                             <button
                               onClick={() => handleExecuteSearch(search.id)}
                               disabled={submitting}
-                              className="bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
+                              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition disabled:opacity-50"
                             >
-                              Re-search
+                              🔄 Re-search
+                            </button>
+                            <span className="inline-block px-3 py-2 bg-green-100 text-green-800 font-medium rounded text-sm">
+                              ✓ Completed
+                            </span>
+                          </>
+                        ) : status === 'paused' ? (
+                          <>
+                            <button
+                              onClick={() => handleResumeSearch(search.id)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded text-sm transition"
+                            >
+                              ▶ Resume
                             </button>
                             <button
-                              className="bg-gray-300 hover:bg-gray-400 text-gray-900 font-medium py-1 px-3 rounded text-sm transition cursor-not-allowed opacity-50"
-                              disabled
+                              onClick={() => handleCompleteSearch(search.id)}
+                              className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded text-sm transition"
                             >
-                              Completed ✓
+                              ✓ Mark Complete
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => handleExecuteSearch(search.id)}
-                            disabled={submitting}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-3 rounded text-sm transition disabled:opacity-50"
-                          >
-                            {submitting ? 'Running...' : 'Run Now'}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleExecuteSearch(search.id)}
+                              disabled={submitting}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded text-sm transition disabled:opacity-50"
+                            >
+                              {submitting ? '⏳ Running...' : '▶ Run Now'}
+                            </button>
+                            <button
+                              onClick={() => handlePauseSearch(search.id)}
+                              className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded text-sm transition"
+                            >
+                              ⏸ Pause
+                            </button>
+                            <button
+                              onClick={() => handleCompleteSearch(search.id)}
+                              className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded text-sm transition"
+                            >
+                              ✓ Mark Complete
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
