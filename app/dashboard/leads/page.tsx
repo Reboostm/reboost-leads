@@ -111,9 +111,12 @@ export default function LeadsPage() {
       if (response.ok) {
         const data = await response.json();
         setAnalytics(data.data);
+        console.log('[ANALYTICS] Loaded:', data.data);
+      } else {
+        console.error('[ANALYTICS] Response not ok:', response.status);
       }
     } catch (error) {
-      console.error('Error fetching analytics:', error);
+      console.error('[ANALYTICS] Error fetching analytics:', error);
     }
   };
 

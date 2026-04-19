@@ -27,8 +27,17 @@ export async function saveApiKeys(keys: ApiKeysConfig): Promise<void> {
   try {
     const configRef = doc(db, API_KEYS_COLLECTION, CONFIG_DOC_ID);
 
+    // Filter out undefined values - Firestore doesn't accept them
+    const dataToSave: any = {};
+    Object.keys(keys).forEach((key) => {
+      const value = keys[key as keyof ApiKeysConfig];
+      if (value !== undefined) {
+        dataToSave[key] = value;
+      }
+    });
+
     await setDoc(configRef, {
-      ...keys,
+      ...dataToSave,
       dateUpdated: Timestamp.now(),
     }, { merge: true });
 
