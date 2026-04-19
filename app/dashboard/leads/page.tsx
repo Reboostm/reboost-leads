@@ -1493,6 +1493,55 @@ export default function LeadsPage() {
                           {lead.dateLastUpdated && <div>Last Updated: {new Date(lead.dateLastUpdated).toLocaleDateString()}</div>}
                         </div>
                       </div>
+
+                      {/* Website Analysis */}
+                      {(lead.websiteTechStack || lead.trackingPixels || lead.adPlatforms) && (
+                        <div className="mt-6 pt-6 border-t border-indigo-200">
+                          <h4 className="font-semibold text-gray-900 mb-3">🔍 Website Analysis</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Tech Stack */}
+                            {lead.websiteTechStack && (
+                              <div>
+                                <h5 className="text-xs font-semibold text-gray-700 mb-2">💻 Tech Stack</h5>
+                                <div className="bg-white border border-gray-200 rounded px-3 py-2 text-sm font-medium text-gray-900">
+                                  {lead.websiteTechStack}
+                                </div>
+                                {lead.hasSSL && (
+                                  <div className="text-xs text-green-600 mt-1">🔒 SSL Enabled</div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Tracking Pixels */}
+                            {lead.trackingPixels && lead.trackingPixels.length > 0 && (
+                              <div>
+                                <h5 className="text-xs font-semibold text-gray-700 mb-2">📡 Tracking Pixels</h5>
+                                <div className="space-y-1">
+                                  {lead.trackingPixels.map((pixel) => (
+                                    <div key={pixel} className="bg-blue-50 border border-blue-200 rounded px-2 py-1 text-xs font-medium text-blue-900">
+                                      {pixel}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Ad Platforms */}
+                            {lead.adPlatforms && lead.adPlatforms.length > 0 && (
+                              <div>
+                                <h5 className="text-xs font-semibold text-gray-700 mb-2">📢 Ad Platforms</h5>
+                                <div className="space-y-1">
+                                  {lead.adPlatforms.map((platform) => (
+                                    <div key={platform} className="bg-green-50 border border-green-200 rounded px-2 py-1 text-xs font-medium text-green-900">
+                                      {platform}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
