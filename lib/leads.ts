@@ -267,8 +267,17 @@ export async function batchCreateLeads(
  * Create or update a search configuration
  */
 export async function saveLeadSearch(search: Omit<LeadSearch, 'id'>): Promise<string> {
+  // Filter out undefined values - Firestore doesn't accept them
+  const dataToSave: any = {};
+  Object.keys(search).forEach((key) => {
+    const value = search[key as keyof Omit<LeadSearch, 'id'>];
+    if (value !== undefined) {
+      dataToSave[key] = value;
+    }
+  });
+
   const searchData = {
-    ...search,
+    ...dataToSave,
     dateCreated: search.dateCreated || Timestamp.now(),
     dateLastRun: search.dateLastRun ? Timestamp.fromDate(search.dateLastRun) : null,
   };
