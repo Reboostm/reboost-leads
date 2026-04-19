@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { searchGoogleMapsBusinesses } from '../../../lib/apis/googleMaps';
 import { findEmailsFromDomain, extractDomainFromUrl } from '../../../lib/apis/hunter';
 import { batchCreateLeads, getLeadsCount, updateLeadSearch, markSearchCompleted, getLeadSearches } from '../../../lib/leads';
+import { getApiKeys } from '../../../lib/api-keys';
 import { analyzeWebsite } from '../../../lib/website-analyzer';
 import { Lead } from '../../../lib/types/lead';
 
@@ -72,6 +73,25 @@ export default async function handler(
 
   try {
     console.log(`[SEARCH] Starting search: ${niche} in ${city || state} (max: ${finalMaxLeads} leads)`);
+
+    // Load API keys from Firestore (user's saved keys take priority)
+    const savedKeys = await getApiKeys();
+    const googleMapsApiKey = savedKeys?.googleMapsApiKey || process.env.GOOGLE_MAPS_API_KEY;
+    const hunterIoApiKey = savedKeys?.hunterIoApiKey || process.env.HUNTER_IO_API_KEY;
+
+    if (!googleMapsApiKey || googleMapsApiKey === 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Google Maps API key not configured',
+        error: 'Please add your Google Maps API key in API Setup dashboard',
+      });
+    }
+
+    // Set API keys in environment for the search functions
+    process.env.GOOGLE_MAPS_API_KEY = googleMapsApiKey;
+    if (hunterIoApiKey && hunterIoApiKey !== 'YOUR_HUNTER_IO_API_KEY_HERE') {
+      process.env.HUNTER_IO_API_KEY = hunterIoApiKey;
+    }
 
     // Step 1: Search Google Maps
     const googleResults = await searchGoogleMapsBusinesses(niche, state, city);
