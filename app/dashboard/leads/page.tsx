@@ -214,7 +214,6 @@ export default function LeadsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.NEXT_PUBLIC_REBOOST_API_KEY || '',
         },
         body: JSON.stringify({
           niche: search.niche,

@@ -54,15 +54,6 @@ export default async function handler(
     });
   }
 
-  // Check authentication
-  if (typeof req.headers['x-api-key'] !== 'string' || req.headers['x-api-key'] !== process.env.REBOOST_API_KEY) {
-    return res.status(401).json({
-      success: false,
-      message: 'Unauthorized',
-      error: 'Invalid or missing API key',
-    });
-  }
-
   const { niche, state, city, enrichWithEmails, searchId, maxLeads } = req.body as ExecuteSearchRequest;
 
   // Validation
