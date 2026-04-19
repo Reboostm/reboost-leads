@@ -132,7 +132,7 @@ export const NICHES = [
   'Roofing - Residential',
   'Roofing - Commercial',
 
-  // Specialized
+  // Specialized Services
   'Pest Control - Residential',
   'Pest Control - Commercial',
   'General Contractor',
@@ -141,6 +141,24 @@ export const NICHES = [
   'Concrete & Masonry',
   'Carpentry',
   'Drywall & Insulation',
+
+  // Legal Services
+  'Divorce Lawyers',
+  'Family Law - Custody & Adoption',
+  'Bankruptcy Lawyers',
+  'Personal Injury Lawyers',
+  'Criminal Defense Lawyers',
+  'DUI / Traffic Lawyers',
+  'Employment Lawyers',
+  'Workers Compensation Lawyers',
+  'Real Estate Lawyers',
+  'Estate Planning Lawyers',
+  'Medical Malpractice Lawyers',
+  'Product Liability Lawyers',
+  'Intellectual Property Lawyers',
+  'Corporate & Business Lawyers',
+  'Contract Lawyers',
+  'Immigration Lawyers',
 
   // Catch-all
   'Custom',

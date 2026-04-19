@@ -474,3 +474,65 @@ export async function getRecentActivities(limit: number = 50): Promise<Activity[
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
     .slice(0, limit);
 }
+
+/**
+ * Get a single lead by ID
+ */
+export async function getLeadById(leadId: string): Promise<Lead | null> {
+  try {
+    const docRef = doc(db, LEADS_COLLECTION, leadId);
+    const snapshot = await getDoc(docRef);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    const data = snapshot.data();
+    return {
+      id: snapshot.id,
+      ...(data as Omit<Lead, 'id'>),
+      dateFound: data.dateFound instanceof Timestamp ? data.dateFound.toDate() : new Date(data.dateFound),
+      dateLastUpdated: data.dateLastUpdated instanceof Timestamp ? data.dateLastUpdated.toDate() : new Date(data.dateLastUpdated),
+      dateGhlPushed: data.dateGhlPushed instanceof Timestamp ? data.dateGhlPushed.toDate() : data.dateGhlPushed ? new Date(data.dateGhlPushed) : undefined,
+      lastEmailOpenDate: data.lastEmailOpenDate instanceof Timestamp ? data.lastEmailOpenDate.toDate() : data.lastEmailOpenDate ? new Date(data.lastEmailOpenDate) : undefined,
+      lastContactAttempt: data.lastContactAttempt instanceof Timestamp ? data.lastContactAttempt.toDate() : data.lastContactAttempt ? new Date(data.lastContactAttempt) : undefined,
+    };
+  } catch (error) {
+    console.error('[LEADS] Error getting lead by ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Update specific fields on a lead
+ */
+export async function updateLeadData(leadId: string, updates: Partial<Lead>): Promise<void> {
+  try {
+    const docRef = doc(db, LEADS_COLLECTION, leadId);
+
+    // Convert Date objects to Firestore Timestamps
+    const dataToUpdate: any = { ...updates };
+    if (updates.dateLastUpdated) {
+      dataToUpdate.dateLastUpdated = Timestamp.fromDate(updates.dateLastUpdated as Date);
+    }
+    if (updates.dateGhlPushed instanceof Date) {
+      dataToUpdate.dateGhlPushed = Timestamp.fromDate(updates.dateGhlPushed);
+    }
+    if (updates.lastEmailOpenDate instanceof Date) {
+      dataToUpdate.lastEmailOpenDate = Timestamp.fromDate(updates.lastEmailOpenDate);
+    }
+    if (updates.lastContactAttempt instanceof Date) {
+      dataToUpdate.lastContactAttempt = Timestamp.fromDate(updates.lastContactAttempt);
+    }
+
+    // Add update timestamp
+    if (!dataToUpdate.dateLastUpdated) {
+      dataToUpdate.dateLastUpdated = Timestamp.now();
+    }
+
+    await updateDoc(docRef, dataToUpdate);
+  } catch (error) {
+    console.error('[LEADS] Error updating lead:', error);
+    throw error;
+  }
+}

@@ -26,6 +26,12 @@ export interface Lead {
   yearFounded?: number;
   employeeCount?: string;
 
+  // Website Analysis (Tech Stack, Tracking, Ads)
+  websiteTechStack?: string; // e.g., "WordPress", "Shopify", "Custom"
+  trackingPixels?: string[]; // e.g., ["Google Analytics", "Facebook Pixel"]
+  adPlatforms?: string[]; // e.g., ["Google Ads", "Facebook Ads"]
+  hasSSL?: boolean; // Whether website has SSL certificate
+
   // Primary Contact Information (CRITICAL FOR OUTREACH)
   primaryEmail?: string;
   secondaryEmails?: string[];

@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { searchGoogleMapsBusinesses } from '../../../lib/apis/googleMaps';
 import { findEmailsFromDomain, extractDomainFromUrl } from '../../../lib/apis/hunter';
 import { batchCreateLeads, getLeadsCount, updateLeadSearch, markSearchCompleted, getLeadSearches } from '../../../lib/leads';
+import { analyzeWebsite } from '../../../lib/website-analyzer';
 import { Lead } from '../../../lib/types/lead';
 
 interface ExecuteSearchRequest {
@@ -127,6 +128,14 @@ export default async function handler(
         phone: lead.primaryPhone,
       }));
 
+    // Step 6: Fire off website analysis in the background (don't wait for it)
+    // This analyzes tech stack, tracking pixels, and ad platforms
+    if (batchResult.newLeads.length > 0) {
+      analyzeNewLeadsWebsites(batchResult.newLeads).catch((err) => {
+        console.error('[WEBSITE ANALYSIS ERROR]', err);
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: `Successfully scraped ${batchResult.created} new leads for ${niche} in ${city || state}`,
@@ -192,4 +201,47 @@ async function enrichLeadsWithEmails(leads: Omit<Lead, 'id' | 'dateFound' | 'dat
 
   console.log(`[ENRICHMENT] Successfully enriched ${enrichedCount}/${leads.length} leads with emails`);
   return leads;
+}
+
+/**
+ * Background task: Analyze newly created leads for tech stack, tracking pixels, ad platforms
+ * This runs asynchronously without blocking the main response
+ */
+async function analyzeNewLeadsWebsites(leadIds: string[]): Promise<void> {
+  try {
+    const { getLeadById, updateLeadData } = await import('../../../lib/leads');
+
+    let analyzedCount = 0;
+
+    for (const leadId of leadIds) {
+      try {
+        const lead = await getLeadById(leadId);
+        if (!lead || !lead.website) {
+          continue;
+        }
+
+        // Analyze the website
+        const analysis = await analyzeWebsite(lead.website);
+
+        // Update lead with analysis results
+        await updateLeadData(leadId, {
+          websiteTechStack: analysis.techStack,
+          trackingPixels: analysis.trackingPixels,
+          adPlatforms: analysis.adPlatforms,
+          hasSSL: analysis.hasSSL,
+        });
+
+        analyzedCount++;
+
+        // Rate limiting to avoid overwhelming servers
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch (error) {
+        console.warn(`[WEBSITE ANALYSIS WARNING] Failed to analyze lead ${leadId}:`, error);
+      }
+    }
+
+    console.log(`[WEBSITE ANALYSIS] Successfully analyzed ${analyzedCount}/${leadIds.length} lead websites`);
+  } catch (error) {
+    console.error('[WEBSITE ANALYSIS ERROR]', error);
+  }
 }
