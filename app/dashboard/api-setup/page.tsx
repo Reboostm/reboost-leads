@@ -114,6 +114,11 @@ export default function ApiSetupPage() {
   };
 
   const handleSaveApiKeys = async () => {
+    if (!envVars.googleMapsApiKey && !envVars.hunterIoApiKey) {
+      alert('⚠️ Please enter at least one API key (Google Maps or Hunter.io)');
+      return;
+    }
+
     try {
       await saveApiKeys({
         googleMapsApiKey: envVars.googleMapsApiKey || undefined,
@@ -123,7 +128,7 @@ export default function ApiSetupPage() {
       alert('✅ API keys saved! They will now work on all your machines.');
     } catch (error) {
       console.error('Error saving API keys:', error);
-      alert('❌ Error saving API keys. Please try again.');
+      alert(`❌ Error saving API keys: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
