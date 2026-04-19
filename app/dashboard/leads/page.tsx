@@ -78,9 +78,31 @@ export default function LeadsPage() {
     }
   }, [router]);
 
+  // Fetch leads from database
+  const fetchLeads = async () => {
+    try {
+      const response = await fetch('/api/leads/list');
+      if (response.ok) {
+        const data = await response.json();
+        // Convert Firestore Timestamps to Date objects
+        const leads = (data.leads || []).map((lead: any) => ({
+          ...lead,
+          dateFound: lead.dateFound ? new Date(lead.dateFound) : new Date(),
+          dateLastUpdated: lead.dateLastUpdated ? new Date(lead.dateLastUpdated) : new Date(),
+          dateGhlPushed: lead.dateGhlPushed ? new Date(lead.dateGhlPushed) : undefined,
+          lastEmailOpenDate: lead.lastEmailOpenDate ? new Date(lead.lastEmailOpenDate) : undefined,
+        }));
+        setLeads(leads);
+      }
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+    }
+  };
+
   // Fetch data
   useEffect(() => {
     if (isAuthed) {
+      fetchLeads();
       fetchSearches();
       fetchMetrics();
       calculateNicheStats();
@@ -98,7 +120,15 @@ export default function LeadsPage() {
       const response = await fetch('/api/searches/list');
       if (response.ok) {
         const data = await response.json();
-        setSearches(data.searches || []);
+        // Convert Firestore Timestamps to Date objects
+        const searches = (data.searches || []).map((search: any) => ({
+          ...search,
+          dateCreated: search.dateCreated ? new Date(search.dateCreated) : new Date(),
+          dateLastRun: search.dateLastRun ? new Date(search.dateLastRun) : null,
+          completedDate: search.completedDate ? new Date(search.completedDate) : null,
+          nextRunTime: search.nextRunTime ? new Date(search.nextRunTime) : null,
+        }));
+        setSearches(searches);
       }
     } catch (error) {
       console.error('Error fetching searches:', error);
@@ -233,6 +263,7 @@ export default function LeadsPage() {
       if (response.ok) {
         const result = await response.json();
         alert(`Found ${result.results.newLeadsAdded} new leads!`);
+        fetchLeads();
         fetchSearches();
         fetchMetrics();
       } else {
