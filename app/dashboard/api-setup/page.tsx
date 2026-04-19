@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getApiKeys, saveApiKeys } from '../../../lib/api-keys';
 
 interface ApiStatus {
   service: string;
@@ -37,12 +38,29 @@ export default function ApiSetupPage() {
     }
   }, [router]);
 
-  // Check API status
+  // Load API keys from database and check API status
   useEffect(() => {
     if (isAuthed) {
+      loadApiKeys();
       checkApiStatus();
     }
   }, [isAuthed]);
+
+  const loadApiKeys = async () => {
+    try {
+      const savedKeys = await getApiKeys();
+      if (savedKeys) {
+        setEnvVars({
+          googleMapsApiKey: savedKeys.googleMapsApiKey || '',
+          hunterIoApiKey: savedKeys.hunterIoApiKey || '',
+          reboostApiKey: savedKeys.cronSecret || '',
+          cronSecret: savedKeys.cronSecret || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading API keys:', error);
+    }
+  };
 
   const checkApiStatus = async () => {
     try {
@@ -92,6 +110,20 @@ export default function ApiSetupPage() {
       });
     } finally {
       setTestLoading(false);
+    }
+  };
+
+  const handleSaveApiKeys = async () => {
+    try {
+      await saveApiKeys({
+        googleMapsApiKey: envVars.googleMapsApiKey || undefined,
+        hunterIoApiKey: envVars.hunterIoApiKey || undefined,
+        cronSecret: envVars.cronSecret || undefined,
+      });
+      alert('✅ API keys saved! They will now work on all your machines.');
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+      alert('❌ Error saving API keys. Please try again.');
     }
   };
 
@@ -269,6 +301,24 @@ export default function ApiSetupPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Save All API Keys Button */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-green-900 mb-2">💾 Save API Keys</h3>
+              <p className="text-sm text-green-800">
+                Save your API keys to the database so they work across all your machines (laptop, desktop, etc.)
+              </p>
+            </div>
+            <button
+              onClick={handleSaveApiKeys}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded text-sm transition whitespace-nowrap ml-4"
+            >
+              ✓ Save API Keys
+            </button>
           </div>
         </div>
 
